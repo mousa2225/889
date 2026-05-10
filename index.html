@@ -31,6 +31,7 @@
 
   <!-- App Styles -->
   <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -164,7 +165,10 @@
         <span class="cv" id="srvDisp">--:--:--</span>
       </div>
       <button type="button" onclick="togTh()" class="tb"><i class="fa-solid fa-sun"></i></button>
-      <button type="button" onclick="openAP()" class="bs relative" id="adB" style="display:none">
+      <button type="button" onclick="openRP()" class="bs relative" id="rpBtn" style="display:none">
+          <i class="fa-solid fa-chart-line text-accent text-xs"></i> تقارير مالية
+        </button>
+        <button type="button" onclick="openAP()" class="bs relative" id="adB" style="display:none">
         <i class="fa-solid fa-shield-halved text-accent text-xs"></i> لوحة التحكم
         <span id="pendBdg" class="dg-badge" style="display:none">0</span>
       </button>
@@ -425,7 +429,8 @@
 <script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/app.js"></script>
-<script src="js/admin.js"></script>
+<script src="js/reports.js"></script>
+  <script src="js/admin.js"></script>
 <script src="js/export.js"></script>
 
 <!-- App Init -->
@@ -459,6 +464,133 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+<!-- ===================== REPORTS MODAL ===================== -->
+<div class="mo fixed inset-0 z-50 flex items-center justify-center p-2" id="rpM">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="clRP()"></div>
+  <div class="mc relative crd w-full max-w-5xl" style="max-height:92vh;overflow-y:auto">
+    <!-- Header -->
+    <div class="sticky top-0 z-10 px-5 py-3 flex items-center justify-between" style="background:var(--cs);border-bottom:1px solid var(--brd)">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(0,212,170,.12)">
+          <i class="fa-solid fa-chart-line text-accent text-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-[800]">التقارير المالية</h2>
+          <div class="text-[9px]" style="color:var(--mt)">V-SHAPE — للمدير فقط</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="rpExport()" class="bp bp-sm text-xs"><i class="fa-solid fa-file-excel text-[10px]"></i> تصدير Excel</button>
+        <button type="button" onclick="rpPrint()" class="bs text-xs" style="padding:5px 12px"><i class="fa-solid fa-print text-[10px]"></i> طباعة</button>
+        <button type="button" onclick="clRP()" class="w-7 h-7 rounded-md flex items-center justify-center" style="background:var(--ib);color:var(--dm)"><i class="fa-solid fa-xmark text-xs"></i></button>
+      </div>
+    </div>
+
+    <div class="p-4">
+      <!-- فلتر الفترة -->
+      <div class="rounded-xl p-3 mb-4 flex flex-wrap items-end gap-3" style="background:var(--cs);border:1px solid var(--brd)">
+        <div><label class="block text-[10px] font-bold mb-1" style="color:var(--dm)">من تاريخ</label><input type="date" id="rpFr" class="fi" style="padding:6px 10px;font-size:12px;width:150px"></div>
+        <div><label class="block text-[10px] font-bold mb-1" style="color:var(--dm)">إلى تاريخ</label><input type="date" id="rpTo" class="fi" style="padding:6px 10px;font-size:12px;width:150px"></div>
+        <button type="button" onclick="rpRender()" class="bp" style="padding:7px 18px;font-size:11px"><i class="fa-solid fa-magnifying-glass text-[10px]"></i> عرض</button>
+        <button type="button" onclick="rpSetDefaults();rpRender()" class="bs" style="padding:7px 14px;font-size:11px">الشهر الحالي</button>
+        <button type="button" onclick="document.getElementById('rpFr').value=new Date().getFullYear()+'-01-01';document.getElementById('rpTo').value=new Date().getFullYear()+'-12-31';rpRender()" class="bs" style="padding:7px 14px;font-size:11px">هذه السنة</button>
+        <button type="button" onclick="document.getElementById('rpFr').value='';document.getElementById('rpTo').value='';rpRender()" class="bs" style="padding:7px 14px;font-size:11px">الكل</button>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-4">
+        <div class="st" style="grid-column:span 1">
+          <div class="sl">إجمالي الطلبات</div>
+          <div class="sn text-accent" id="rpK1">0</div>
+          <div class="ss">جميع السجلات</div>
+        </div>
+        <div class="st">
+          <div class="sl">إجمالي المبالغ</div>
+          <div class="sn" style="font-size:14px;color:#f59e0b" id="rpK2">0</div>
+          <div class="ss">كل الحالات</div>
+        </div>
+        <div class="st">
+          <div class="sl">تم الاسترداد</div>
+          <div class="sn" style="color:#22c55e" id="rpK3">0</div>
+          <div class="ss" id="rpK4" style="color:#22c55e;font-size:10px;font-weight:700">0</div>
+        </div>
+        <div class="st">
+          <div class="sl">قيد المراجعة</div>
+          <div class="sn" style="color:#e97a2a" id="rpK5">0</div>
+          <div class="ss" id="rpK6" style="color:#e97a2a;font-size:10px;font-weight:700">0</div>
+        </div>
+        <div class="st">
+          <div class="sl">تم الرفع</div>
+          <div class="sn" style="color:#64748b" id="rpK7">0</div>
+          <div class="ss">بانتظار المراجعة</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2.5 mb-4">
+        <div class="st">
+          <div class="sl">سبق الاسترداد</div>
+          <div class="sn" style="color:#dc3545" id="rpK8">0</div>
+          <div class="ss">عملاء مكررون</div>
+        </div>
+        <div class="st">
+          <div class="sl">استرداد اشتراك</div>
+          <div class="sn text-accent" id="rpK9">0</div>
+          <div class="ss">إلغاء باقة</div>
+        </div>
+        <div class="st">
+          <div class="sl">استرداد مباشر</div>
+          <div class="sn" style="color:#e97a2a" id="rpK10">0</div>
+          <div class="ss">تعويضات وتعديلات</div>
+        </div>
+      </div>
+
+      <!-- Charts Row 1 -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        <div class="crd p-3">
+          <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-chart-pie ml-1 text-accent"></i>توزيع الحالات</div>
+          <div style="height:180px"><canvas id="rpCStatus"></canvas></div>
+        </div>
+        <div class="crd p-3">
+          <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-chart-pie ml-1" style="color:#e97a2a"></i>نوع الاسترداد (بالمبلغ)</div>
+          <div style="height:180px"><canvas id="rpCType"></canvas></div>
+        </div>
+        <div class="crd p-3">
+          <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-users ml-1" style="color:#60a5fa"></i>أداء المستخدمين</div>
+          <div style="height:180px"><canvas id="rpCUsers"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Chart: Daily -->
+      <div class="crd p-3 mb-3">
+        <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-chart-bar ml-1 text-accent"></i>الاسترداد اليومي (المبلغ + عدد الطلبات)</div>
+        <div style="height:200px"><canvas id="rpCDaily"></canvas></div>
+      </div>
+
+      <!-- Chart: Reasons -->
+      <div class="crd p-3 mb-3">
+        <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-list-ul ml-1" style="color:#a78bfa"></i>أكثر أسباب الإلغاء والاسترداد</div>
+        <div style="height:200px"><canvas id="rpCReasons"></canvas></div>
+      </div>
+
+      <!-- Table: Prev Refunded -->
+      <div class="crd p-3">
+        <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-triangle-exclamation ml-1" style="color:#dc3545"></i>العملاء الذين سبق استردادهم (نفس الاشتراك)</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-family:Tajawal,sans-serif">
+            <thead><tr style="background:rgba(220,53,69,.08)">
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#dc3545;border-bottom:1px solid var(--brd)">اسم العميل</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#dc3545;border-bottom:1px solid var(--brd)">الرقم</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#dc3545;border-bottom:1px solid var(--brd)">تاريخ الاشتراك</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#dc3545;border-bottom:1px solid var(--brd)">المبلغ</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#dc3545;border-bottom:1px solid var(--brd)">الحالة</th>
+            </tr></thead>
+            <tbody id="rpTBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===================== ADMIN PANEL MODAL ===================== -->
 <div class="mo fixed inset-0 z-50 flex items-center justify-center p-4" id="adM">
@@ -511,7 +643,8 @@ window.addEventListener('DOMContentLoaded', function() {
 <script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/app.js"></script>
-<script src="js/admin.js"></script>
+<script src="js/reports.js"></script>
+  <script src="js/admin.js"></script>
 <script src="js/export.js"></script>
 
 <!-- App Init -->
