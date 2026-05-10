@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام استرداد العملاء V-SHAPE</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { accent:'#00d4aa', 'accent-dark':'#00a88a', warm:'#e97a2a', danger:'#dc3545', success:'#22c55e' },
+          fontFamily: { taj: ['Tajawal','sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- ExcelJS -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Background Glows -->
+<div class="gl g1"></div>
+<div class="gl g2"></div>
+
+<!-- Footer watermark -->
+<div style="position:fixed;bottom:7px;left:9px;z-index:1;font-size:8.5px;color:rgba(100,116,139,.16);pointer-events:none;user-select:none">Accountant mousa</div>
+
+<!-- ===================== AUTH SCREEN ===================== -->
+<div id="authScr" style="position:relative;z-index:20" class="min-h-screen flex items-center justify-center px-4">
+  <div class="crd w-full max-w-md p-7">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-5">
+      <div class="text-center flex-1">
+        <h1 class="text-lg font-[900] mt-1.5">نظام استرداد العملاء</h1>
+        <span class="text-accent font-[900] text-[10px] tracking-wider">V-SHAPE</span>
+      </div>
+      <button type="button" onclick="togTh()" class="tb"><i class="fa-solid fa-sun"></i></button>
+    </div>
+
+    <!-- DB Connection Error -->
+    <div id="connErr" class="ebx mb-4" style="display:none!important">
+      <i class="fa-solid fa-circle-exclamation text-base"></i>
+      <div>
+        <div class="font-bold mb-1">خطأ في الاتصال بقاعدة البيانات</div>
+        <ul>
+          <li>روح <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+          <li>اضغط <strong>Firestore Database</strong> ثم <strong>إنشاء قاعدة بيانات</strong></li>
+          <li>اختر <strong>وضع الاختبار</strong> ثم تفعيل</li>
+          <li>اضغط تبويب <strong>القواعد</strong> واستبدل:</li>
+        </ul>
+        <code>allow read, write: if true;</code>
+        <ul><li>اضغط <strong>نشر</strong> ثم أعد تحميل</li></ul>
+      </div>
+    </div>
+
+    <!-- Tab Switch -->
+    <div class="flex items-center justify-center gap-2 mb-5 rounded-lg p-0.5" style="background:rgba(100,116,139,.06)">
+      <button type="button" class="at on" id="tabL" onclick="swT('l')">تسجيل الدخول</button>
+      <button type="button" class="at"    id="tabR" onclick="swT('r')">إنشاء حساب</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="lF">
+      <div id="lNorm">
+        <div class="mb-3">
+          <label class="block text-xs font-bold mb-1" style="color:var(--dm)">اسم المستخدم</label>
+          <input type="text" id="lU" class="fi" placeholder="أدخل اسم المستخدم" onkeydown="if(event.key==='Enter')doL()">
+        </div>
+        <div class="mb-2">
+          <label class="block text-xs font-bold mb-1" style="color:var(--dm)">كلمة المرور</label>
+          <input type="password" id="lP" class="fi" placeholder="أدخل كلمة المرور" onkeydown="if(event.key==='Enter')doL()">
+        </div>
+        <div id="lEr" class="ebx mb-3"><i class="fa-solid fa-circle-xmark text-sm"></i><span id="lEm"></span></div>
+        <button type="button" onclick="doL()" id="lBt" class="bp w-full">
+          <i class="fa-solid fa-right-to-bracket text-sm"></i> دخول
+        </button>
+        <div class="text-center mt-3">
+          <button type="button" class="lkn" onclick="showFg()">نسيت كلمة المرور؟</button>
+        </div>
+      </div>
+
+      <!-- Forgot Password -->
+      <div id="lFg" style="display:none">
+        <div class="rounded-lg p-2.5 mb-4 text-center text-[11px] font-bold" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);color:#f59e0b">
+          <i class="fa-solid fa-circle-info ml-1"></i> سيتم رفع طلب تغيير كلمة المرور
+        </div>
+        <div class="mb-3">
+          <label class="block text-xs font-bold mb-1" style="color:var(--dm)">اسم المستخدم</label>
+          <input type="text" id="fU" class="fi" placeholder="اسم المستخدم">
+        </div>
+        <div class="mb-3">
+          <label class="block text-xs font-bold mb-1" style="color:var(--dm)">كلمة المرور الجديدة</label>
+          <input type="text" id="fP" class="fi" placeholder="كلمة المرور الجديدة">
+        </div>
+        <div id="fEr" class="ebx mb-3"><i class="fa-solid fa-circle-xmark text-sm"></i><span id="fEm"></span></div>
+        <div id="fOk" style="display:none;padding:12px;border-radius:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#22c55e;font-size:13px;font-weight:600">
+          <i class="fa-solid fa-circle-check ml-1"></i><span id="fOm"></span>
+        </div>
+        <div class="flex gap-2.5">
+          <button type="button" onclick="doFg()" class="bp flex-1 text-xs"><i class="fa-solid fa-paper-plane"></i> رفع الطلب</button>
+          <button type="button" onclick="hideFg()" class="bs text-xs">رجوع</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="rF" style="display:none">
+      <div id="fh" class="rounded-lg p-2.5 mb-4 text-center text-[11px] font-bold" style="background:rgba(0,212,170,.06);border:1px solid rgba(0,212,170,.15);color:#00d4aa;display:none">
+        <i class="fa-solid fa-shield-halved ml-1"></i> أول حساب سيكون مدير تلقائياً
+      </div>
+      <div class="mb-3">
+        <label class="block text-xs font-bold mb-1" style="color:var(--dm)">اسم المستخدم</label>
+        <input type="text" id="rU" class="fi" placeholder="اختر اسم مستخدم">
+      </div>
+      <div class="mb-3">
+        <label class="block text-xs font-bold mb-1" style="color:var(--dm)">كلمة المرور</label>
+        <input type="password" id="rP" class="fi" placeholder="اختر كلمة مرور">
+      </div>
+      <div class="mb-3">
+        <label class="block text-xs font-bold mb-1" style="color:var(--dm)">تأكيد كلمة المرور</label>
+        <input type="password" id="rP2" class="fi" placeholder="أعد كتابة كلمة المرور">
+      </div>
+      <div id="rEr" class="ebx mb-3"><i class="fa-solid fa-circle-xmark text-sm"></i><span id="rEm"></span></div>
+      <div id="rOk" style="display:none;padding:12px;border-radius:10px;background:rgba(233,122,42,.08);border:1px solid rgba(233,122,42,.2);color:#e97a2a;font-size:13px;font-weight:600">
+        <i class="fa-solid fa-clock ml-1"></i><span id="rOm"></span>
+      </div>
+      <button type="button" onclick="doR()" class="bp w-full">
+        <i class="fa-solid fa-user-plus text-sm"></i> إنشاء حساب
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== MAIN APP ===================== -->
+<div id="app" style="position:relative;z-index:20;display:none" class="max-w-[1700px] mx-auto px-3 sm:px-5 pb-10">
+
+  <!-- Header -->
+  <header class="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+    <div class="flex items-center gap-2.5">
+      <h1 class="text-lg font-[900] leading-tight">نظام استرداد العملاء</h1>
+      <span class="text-accent font-[900] text-[10px] tracking-wider">V-SHAPE</span>
+    </div>
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <div class="sc" id="srvClk" style="display:none">
+        <i class="fa-solid fa-server text-[9px]"></i>
+        <span class="cv" id="srvDisp">--:--:--</span>
+      </div>
+      <button type="button" onclick="togTh()" class="tb"><i class="fa-solid fa-sun"></i></button>
+      <button type="button" onclick="openAP()" class="bs relative" id="adB" style="display:none">
+        <i class="fa-solid fa-shield-halved text-accent text-xs"></i> لوحة التحكم
+        <span id="pendBdg" class="dg-badge" style="display:none">0</span>
+      </button>
+      <button type="button" onclick="openCM()" class="bp text-xs" id="addBtn">
+        <i class="fa-solid fa-plus text-[11px]"></i> إضافة عميل
+      </button>
+      <!-- Export Dropdown -->
+      <div class="relative">
+        <button type="button" onclick="togEm()" class="bs" id="exB" style="display:none">
+          <i class="fa-solid fa-file-excel text-success text-xs"></i> تصدير
+          <i class="fa-solid fa-chevron-down text-[8px]" style="color:var(--mt)"></i>
+        </button>
+        <div class="em" id="exM">
+          <button type="button" class="ei" onclick="expD()">
+            <i class="fa-solid fa-calendar-day text-accent"></i>
+            <div>تصدير اليوم<span class="dd">عملاء أُضيفوا اليوم</span></div>
+          </button>
+          <div class="es"></div>
+          <div style="padding:8px 12px">
+            <div class="text-[10px] font-bold mb-1.5" style="color:var(--dm)">
+              <i class="fa-solid fa-calendar-days ml-1"></i>تصدير بتاريخ
+            </div>
+            <div class="flex gap-1.5">
+              <input type="date" id="exDt" class="fi fi-sm" style="flex:1">
+              <button type="button" onclick="expByDt()" class="bp bp-sm px-3"><i class="fa-solid fa-download"></i></button>
+            </div>
+          </div>
+          <div class="es"></div>
+          <button type="button" class="ei" id="exA" onclick="expA()" style="display:none">
+            <i class="fa-solid fa-database text-warm"></i>
+            <div>تصدير الكل<span class="dd">جميع العملاء</span></div>
+          </button>
+        </div>
+      </div>
+      <!-- User Badge -->
+      <div class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style="background:var(--cs);border:1px solid var(--brd)">
+        <span id="uBg" class="rb rb-u"></span>
+        <span id="uNm" class="text-xs font-bold" style="color:var(--dm)"></span>
+        <button type="button" onclick="doOut()" style="color:var(--mt)" title="خروج">
+          <i class="fa-solid fa-right-from-bracket text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <section class="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-4" id="sS" style="display:none">
+    <div class="st"><div class="sl">إجمالي العملاء</div><div class="sn num" id="sT">0</div></div>
+    <div class="st"><div class="sl">تم الرفع</div><div class="sn num" id="sU">0</div></div>
+    <div class="st"><div class="sl">إجمالي المسترد</div><div class="sn num text-accent" id="sTR">0</div><div class="ss num">ريال</div></div>
+    <div class="st">
+      <div class="flex items-center gap-1.5 mb-0.5"><span class="dl"></span><span class="sl" style="margin:0">تم الاسترداد</span></div>
+      <div class="sn num text-success" id="sR">0</div><div class="ss num" id="sRA">0 ريال</div>
+    </div>
+    <div class="st"><div class="sl">قيد المراجعة</div><div class="sn num text-warm" id="sP">0</div><div class="ss num" id="sPA">0 ريال</div></div>
+  </section>
+
+  <!-- Filters -->
+  <section class="mb-3 flex flex-col gap-2.5" id="flS" style="display:none">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2.5">
+      <div class="relative flex-1 w-full sm:max-w-xs">
+        <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-1/2 -translate-y-1/2 text-xs" style="color:var(--mt)"></i>
+        <input type="text" id="sI" placeholder="بحث..." class="fi pr-9 text-xs" oninput="rnT()">
+      </div>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button type="button" class="ft on" onclick="sFt('all',this)">الكل</button>
+        <button type="button" class="ft"    onclick="sFt('uploaded',this)">تم الرفع</button>
+        <button type="button" class="ft"    onclick="sFt('pending',this)">قيد المراجعة</button>
+        <button type="button" class="ft"    onclick="sFt('refunded',this)">تم الاسترداد</button>
+        <button type="button" class="ft"    onclick="sFt('prev',this)">سبق الاسترداد</button>
+      </div>
+    </div>
+
+    <!-- Date Filter (Admin Only) -->
+    <div class="dtf-box" id="dtFl" style="display:none">
+      <div class="flex items-center gap-2 mb-2">
+        <i class="fa-solid fa-filter text-warm text-xs"></i>
+        <span class="text-xs font-bold" style="color:var(--dm)">فلترة حسب التاريخ</span>
+        <button type="button" onclick="rDF()" id="dtRstBtn" style="color:var(--mt);background:none;border:none;cursor:pointer;text-decoration:underline;display:none;font-size:10px">إعادة تعيين</button>
+      </div>
+      <div class="flex flex-wrap items-end gap-2.5">
+        <div>
+          <label>حسب</label>
+          <select id="dtField" class="fi fi-sm" style="width:150px">
+            <option value="created">تاريخ الإضافة</option>
+            <option value="refund">تاريخ الاسترداد</option>
+            <option value="subscription">تاريخ الاشتراك</option>
+            <option value="cancel">تاريخ الإلغاء</option>
+          </select>
+        </div>
+        <div>
+          <label>النوع</label>
+          <select id="dtType" class="fi fi-sm" style="width:130px" onchange="cDT()">
+            <option value="range">من - إلى</option>
+            <option value="date">يوم محدد</option>
+            <option value="month">شهر</option>
+            <option value="year">سنة</option>
+          </select>
+        </div>
+        <div id="dtDateBox"  style="display:none"><label>التاريخ</label><input type="date" id="dtDate" class="fi fi-sm" style="width:150px"></div>
+        <div id="dtRangeBox">                     <label>من</label>    <input type="date" id="dtFrom" class="fi fi-sm" style="width:145px"></div>
+        <div id="dtRangeBox2">                    <label>إلى</label>   <input type="date" id="dtTo"   class="fi fi-sm" style="width:145px"></div>
+        <div id="dtMonthBox" style="display:none"><label>الشهر</label>
+          <div class="flex gap-1.5"><select id="dtM" class="fi fi-sm" style="width:100px"></select><select id="dtMY" class="fi fi-sm" style="width:90px"></select></div>
+        </div>
+        <div id="dtYearBox"  style="display:none"><label>السنة</label><select id="dtY" class="fi fi-sm" style="width:100px"></select></div>
+        <button type="button" onclick="aDF()" class="bp bp-sm px-4">
+          <i class="fa-solid fa-magnifying-glass text-[10px]"></i> فلترة
+        </button>
+      </div>
+      <div id="dtInfo" style="display:none" class="mt-2 text-[11px] font-bold flex items-center gap-1.5"></div>
+    </div>
+    <div id="exS" style="display:none"></div>
+  </section>
+
+  <!-- Table -->
+  <section class="crd overflow-hidden" id="tbS" style="display:none">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>#</th><th>اسم العميل</th><th>الرقم</th><th>تاريخ الاشتراك</th>
+            <th>نوع الباقة</th><th>المبلغ المدفوع</th><th>أيام الباقة</th><th>أيام مستهلكة</th>
+            <th>المبلغ المسترد</th><th>تاريخ الإلغاء</th><th>مدة الإلغاء</th><th>سبب الإلغاء</th>
+            <th>تاريخ الإضافة</th><th>تاريخ الاسترداد</th><th>أضاف بواسطة</th>
+            <th>الحالة</th><th>الرقم المرجعي</th><th>ملاحظات</th><th>إجراء</th>
+          </tr>
+        </thead>
+        <tbody id="tB"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Empty State -->
+  <section id="empS" class="text-center py-14" style="color:var(--mt)">
+    <div class="w-14 h-14 rounded-full mx-auto mb-2.5 flex items-center justify-center" style="background:var(--cs);border:1px solid var(--brd)">
+      <i class="fa-solid fa-inbox text-xl"></i>
+    </div>
+    <p class="font-bold text-sm mb-0.5">لا توجد بيانات بعد</p>
+    <p class="text-xs">اضغط "إضافة عميل" للبدء</p>
+  </section>
+
+</div>
+
+<!-- ===================== ADD CLIENT MODAL ===================== -->
+<div class="mo fixed inset-0 z-50 flex items-center justify-center p-4" id="cmM">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="clCM()"></div>
+  <div class="mc relative crd w-full max-w-xl max-h-[90vh] overflow-y-auto">
+    <div class="sticky top-0 z-10 px-5 py-2.5 flex items-center justify-between" style="background:var(--cs);border-bottom:1px solid var(--brd)">
+      <h2 class="text-base font-[800]">إضافة عميل جديد</h2>
+      <button type="button" onclick="clCM()" class="w-6 h-6 rounded-md flex items-center justify-center" style="background:var(--ib);color:var(--dm)">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+    <div class="p-5">
+
+      <!-- نوع الاسترداد -->
+      <div class="flex gap-1.5 p-1 rounded-xl mb-4" style="background:var(--ib);border:1px solid var(--brd)">
+        <button type="button" id="rtB1" onclick="swRT('sub')" class="rt-btn flex-1 py-2 rounded-lg text-xs font-bold" style="background:rgba(0,212,170,.12);color:#00d4aa;border:1px solid rgba(0,212,170,.25)">
+          <i class="fa-solid fa-rotate-left text-[9px] ml-1"></i> استرداد اشتراك العميل
+        </button>
+        <button type="button" id="rtB2" onclick="swRT('dir')" class="rt-btn flex-1 py-2 rounded-lg text-xs font-bold" style="background:transparent;color:var(--mt);border:1px solid transparent">
+          <i class="fa-solid fa-money-bill-wave text-[9px] ml-1"></i> استرداد مباشر
+        </button>
+      </div>
+
+      <!-- تحذير التكرار مشترك -->
+      <div id="pW" class="wn mb-3"><i class="fa-solid fa-triangle-exclamation"></i><span id="pWT"></span></div>
+
+      <!-- ══ استرداد اشتراك العميل ══ -->
+      <div id="subSec">
+        <div class="mb-4">
+          <label class="block text-xs font-bold mb-1" style="color:var(--dm)">
+            <i class="fa-solid fa-paste ml-1 text-accent"></i> الصق القالب
+          </label>
+          <textarea id="tmI" class="fi" placeholder="اسم العميل : ...&#10;الرقم : ..." oninput="prsTm()"></textarea>
+        </div>
+        <div class="flex items-center gap-2 mb-3">
+          <div class="flex-1 h-px" style="background:var(--brd)"></div>
+          <span class="text-[9px] font-bold" style="color:var(--mt)">أو تعبئة يدوية</span>
+          <div class="flex-1 h-px" style="background:var(--brd)"></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">اسم العميل</label><input type="text" id="fN" class="fi" placeholder="اسم العميل" oninput="chkPD()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">الرقم</label><input type="text" id="fPh" class="fi" placeholder="05XXXXXXXX" oninput="chkPD()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">تاريخ الاشتراك</label><input type="text" id="fSub" class="fi" placeholder="مثال: 1 Jan 2025"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">نوع الباقة</label><input type="text" id="fPk" class="fi" placeholder="غداء عمل-666-20"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">تاريخ الإلغاء</label><input type="text" id="fDt" class="fi" placeholder="5 May"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">مدة الإلغاء</label><input type="text" id="fDr" class="fi" placeholder="مثال: 3 أشهر"></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-2.5">
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">المبلغ المدفوع</label><input type="number" id="fPr" class="fi" placeholder="666" step="0.01" dir="ltr" oninput="uPv()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">أيام الباقة</label><input type="number" id="fDy" class="fi" placeholder="20" dir="ltr" oninput="uPv()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">أيام مستهلكة</label><input type="number" id="fCo" class="fi" placeholder="8" dir="ltr" oninput="uPv()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">سبب الإلغاء</label><input type="text" id="fRs" class="fi" placeholder="السبب..."></div>
+        </div>
+        <div class="rounded-lg p-2.5 mb-3 flex items-center justify-between" style="background:rgba(0,212,170,.05);border:1px solid rgba(0,212,170,.12)">
+          <div>
+            <div class="text-sm font-bold text-accent">المبلغ المسترد</div>
+            <div class="text-[9px]" style="color:var(--mt)">السعر - (سعر اليوم × المستهلكة)</div>
+          </div>
+          <div class="text-lg font-[900] text-accent num" id="pRf">0.00</div>
+        </div>
+      </div>
+
+      <!-- ══ استرداد مباشر ══ -->
+      <div id="dirSec" style="display:none">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">اسم العميل <span style="color:#dc3545">*</span></label><input type="text" id="fDN" class="fi" placeholder="اسم العميل" oninput="chkPD2()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">الرقم <span style="color:#dc3545">*</span></label><input type="text" id="fDPh" class="fi" placeholder="05XXXXXXXX" oninput="chkPD2()"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">تاريخ الاشتراك</label><input type="text" id="fDSub" class="fi" placeholder="مثال: 1 Jan 2025"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">سبب الاسترداد <span style="color:#dc3545">*</span></label><input type="text" id="fDRs" class="fi" placeholder="تعديل باقة، أيام تعويض..."></div>
+        </div>
+        <div class="rounded-lg p-3 mb-3" style="background:rgba(233,122,42,.05);border:1px solid rgba(233,122,42,.2)">
+          <label class="block text-[11px] font-bold mb-2" style="color:#e97a2a">
+            <i class="fa-solid fa-money-bill-wave ml-1 text-[10px]"></i> المبلغ المسترد <span style="color:#dc3545">*</span>
+          </label>
+          <input type="number" id="fDRA" class="fi num" placeholder="0.00" step="0.01" dir="ltr" style="font-size:20px;font-weight:900;color:#e97a2a;text-align:center;border-color:rgba(233,122,42,.3)">
+        </div>
+      </div>
+
+      <!-- ملاحظات مشترك -->
+      <div class="mb-3">
+        <label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">ملاحظات</label>
+        <input type="text" id="fNo" class="fi" placeholder="ملاحظات...">
+      </div>
+
+      <div class="flex gap-2.5">
+        <button type="button" onclick="addC()" class="bp flex-1 text-xs"><i class="fa-solid fa-check"></i> إضافة</button>
+        <button type="button" onclick="clCM()" class="bs text-xs">إلغاء</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CONFIRM DELETE MODAL ===================== -->
+<div class="mo fixed inset-0 z-[60] flex items-center justify-center p-4" id="cfM">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="cfNo()"></div>
+  <div class="mc relative crd p-5 text-center" style="max-width:340px">
+    <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style="background:rgba(220,53,69,.1)">
+      <i class="fa-solid fa-triangle-exclamation text-danger text-xl"></i>
+    </div>
+    <p class="font-bold text-sm mb-1">تأكيد الحذف</p>
+    <p class="text-xs mb-4" style="color:var(--dm)" id="cfMsg">هل أنت متأكد؟</p>
+    <div class="flex gap-2.5">
+      <button type="button" onclick="cfOk()" style="flex:1;padding:8px;border-radius:8px;font-weight:700;font-size:12px;color:#fff;cursor:pointer;border:none;background:#dc3545">نعم، احذف</button>
+      <button type="button" onclick="cfNo()" class="bs" style="flex:1;justify-content:center">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="tBox" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none"></div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/export.js"></script>
+
+<!-- App Init -->
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+  // Apply saved theme to icons
+  document.querySelectorAll('.tb i').forEach(function(i) {
+    i.className = isDk ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  });
+  initDF();
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FC);
+    db = firebase.firestore();
+    db.collection('users').limit(1).get().then(function(snap) {
+      document.getElementById('connErr').style.display = 'none';
+      document.getElementById('fh').style.display = snap.empty ? 'block' : 'none';
+      // Resume session if stored
+      var sv = sessionStorage.getItem('cu');
+      if (sv) {
+        try { cu = JSON.parse(sv); shApp(); stL(); chkP(); }
+        catch(e) { sessionStorage.removeItem('cu'); }
+      }
+    }).catch(function(e) {
+      console.error(e);
+      document.getElementById('connErr').style.display = 'flex';
+    });
+  } catch(e) {
+    console.error('Init error:', e);
+    document.getElementById('connErr').style.display = 'flex';
+  }
+});
+</script>
+
+</body>
+</html>
