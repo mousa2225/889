@@ -286,9 +286,9 @@
       <table class="tbl">
         <thead>
           <tr>
-            <th>#</th><th>اسم العميل</th><th>الرقم</th><th>تاريخ الاشتراك</th>
+            <th>#</th><th>اسم العميل</th><th>الرقم</th><th>نوع الاسترداد</th><th>تاريخ الاشتراك</th>
             <th>نوع الباقة</th><th>المبلغ المدفوع</th><th>أيام الباقة</th><th>أيام مستهلكة</th>
-            <th>المبلغ المسترد</th><th>تاريخ الإلغاء</th><th>مدة الإلغاء</th><th>سبب الإلغاء</th>
+            <th>المبلغ المسترد</th><th>تاريخ الإلغاء</th><th>مدة الإلغاء</th><th>سبب الإلغاء أو الاسترداد</th>
             <th>تاريخ الإضافة</th><th>تاريخ الاسترداد</th><th>أضاف بواسطة</th>
             <th>الحالة</th><th>الرقم المرجعي</th><th>ملاحظات</th><th>إجراء</th>
           </tr>
@@ -376,6 +376,7 @@
           <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">اسم العميل <span style="color:#dc3545">*</span></label><input type="text" id="fDN" class="fi" placeholder="اسم العميل" oninput="chkPD2()"></div>
           <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">الرقم <span style="color:#dc3545">*</span></label><input type="text" id="fDPh" class="fi" placeholder="05XXXXXXXX" oninput="chkPD2()"></div>
           <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">تاريخ الاشتراك</label><input type="text" id="fDSub" class="fi" placeholder="مثال: 1 Jan 2025"></div>
+          <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">نوع الباقة</label><input type="text" id="fDPk" class="fi" placeholder="اختياري..."></div>
           <div><label class="block text-[11px] font-bold mb-1" style="color:var(--dm)">سبب الاسترداد <span style="color:#dc3545">*</span></label><input type="text" id="fDRs" class="fi" placeholder="تعديل باقة، أيام تعويض..."></div>
         </div>
         <div class="rounded-lg p-3 mb-3" style="background:rgba(233,122,42,.05);border:1px solid rgba(233,122,42,.2)">
@@ -457,6 +458,93 @@ window.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+
+
+<!-- ===================== ADMIN PANEL MODAL ===================== -->
+<div class="mo fixed inset-0 z-50 flex items-center justify-center p-4" id="adM">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="clAP()"></div>
+  <div class="mc relative crd w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+    <div class="px-5 py-2.5 flex items-center justify-between shrink-0" style="border-bottom:1px solid var(--brd)">
+      <h2 class="text-base font-[800]"><i class="fa-solid fa-shield-halved text-accent ml-1.5"></i>لوحة تحكم المدير</h2>
+      <button type="button" onclick="clAP()" class="w-6 h-6 rounded-md flex items-center justify-center" style="background:var(--ib);color:var(--dm)">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+    <div class="flex shrink-0 overflow-x-auto" style="border-bottom:1px solid var(--brd)">
+      <button type="button" class="ab on" id="abP" onclick="swAT('p',this)">طلبات <span id="pCt" class="mr-1 text-warm num">(0)</span></button>
+      <button type="button" class="ab"    id="abA" onclick="swAT('a',this)">حسابات <span id="apCt" class="mr-1 text-danger num" style="display:none">(0)</span></button>
+      <button type="button" class="ab"    id="abK" onclick="swAT('k',this)">كلمات المرور <span id="pwCt" class="mr-1 text-warm num" style="display:none">(0)</span></button>
+      <button type="button" class="ab"    id="abU" onclick="swAT('u',this)">المستخدمين</button>
+      <button type="button" class="ab"    id="abS" onclick="swAT('s',this)">الإعدادات</button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-5">
+      <div id="adP"></div>
+      <div id="adA" style="display:none"></div>
+      <div id="adK" style="display:none"></div>
+      <div id="adU" style="display:none"></div>
+      <div id="adS" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CONFIRM DELETE MODAL ===================== -->
+<div class="mo fixed inset-0 z-[60] flex items-center justify-center p-4" id="cfM">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="cfNo()"></div>
+  <div class="mc relative crd p-5 text-center" style="max-width:340px">
+    <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style="background:rgba(220,53,69,.1)">
+      <i class="fa-solid fa-triangle-exclamation text-danger text-xl"></i>
+    </div>
+    <p class="font-bold text-sm mb-1">تأكيد الحذف</p>
+    <p class="text-xs mb-4" style="color:var(--dm)" id="cfMsg">هل أنت متأكد؟</p>
+    <div class="flex gap-2.5">
+      <button type="button" onclick="cfOk()" style="flex:1;padding:8px;border-radius:8px;font-weight:700;font-size:12px;color:#fff;cursor:pointer;border:none;background:#dc3545">نعم، احذف</button>
+      <button type="button" onclick="cfNo()" class="bs" style="flex:1;justify-content:center">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="tBox" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none"></div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/export.js"></script>
+
+<!-- App Init -->
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+  // Apply saved theme to icons
+  document.querySelectorAll('.tb i').forEach(function(i) {
+    i.className = isDk ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  });
+  initDF();
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FC);
+    db = firebase.firestore();
+    db.collection('users').limit(1).get().then(function(snap) {
+      document.getElementById('connErr').style.display = 'none';
+      document.getElementById('fh').style.display = snap.empty ? 'block' : 'none';
+      // Resume session if stored
+      var sv = sessionStorage.getItem('cu');
+      if (sv) {
+        try { cu = JSON.parse(sv); shApp(); stL(); chkP(); }
+        catch(e) { sessionStorage.removeItem('cu'); }
+      }
+    }).catch(function(e) {
+      console.error(e);
+      document.getElementById('connErr').style.display = 'flex';
+    });
+  } catch(e) {
+    console.error('Init error:', e);
+    document.getElementById('connErr').style.display = 'flex';
+  }
+});
+</script>
+
 
 </body>
 </html>

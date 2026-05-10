@@ -172,7 +172,7 @@ function rnT() {
   document.getElementById('flS').style.display   = hd ? 'flex'  : 'none';
   document.getElementById('exB').style.display   = hd ? 'inline-flex' : 'none';
   if (!fl.length) {
-    tb.innerHTML = '<tr><td colspan="19" class="text-center py-8" style="color:var(--mt)"><i class="fa-solid fa-magnifying-glass text-lg mb-1 block"></i>' + (cls.length ? 'لا توجد نتائج' : 'لا توجد بيانات') + '</td></tr>';
+    tb.innerHTML = '<tr><td colspan="20" class="text-center py-8" style="color:var(--mt)"><i class="fa-solid fa-magnifying-glass text-lg mb-1 block"></i>' + (cls.length ? 'لا توجد نتائج' : 'لا توجد بيانات') + '</td></tr>';
     return;
   }
   tb.innerHTML = fl.map(function(c, i) {
@@ -208,13 +208,11 @@ function rnT() {
       nc = '<span class="ro" style="max-width:100px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(c.notes||'')+'">'+esc(c.notes||'—')+'</span>';
     }
 
-    // المبلغ المسترد + إشارة التعديل من المالية (المدير فقط)
+    // المبلغ المسترد + إشارة التعديل من المالية
     var rfAmt = '<span class="rv num">'+en((c.refundAmount||0).toFixed(2))+'</span>';
-    var adminEditBadge = '';
-    if (c.adminEdited) {
-      adminEditBadge = '<div style="font-size:8px;font-weight:700;color:#a78bfa;margin-top:2px;display:flex;align-items:center;gap:2px;white-space:nowrap">'
-        + '<i class="fa-solid fa-pen-to-square" style="font-size:7px"></i> تم التعديل من المالية</div>';
-    }
+    var adminEditBadge = c.adminEdited
+      ? '<div style="font-size:8px;font-weight:700;color:#a78bfa;margin-top:2px;display:flex;align-items:center;gap:2px;white-space:nowrap"><i class="fa-solid fa-pen-to-square" style="font-size:7px"></i> تم التعديل من المالية</div>'
+      : '';
     var rfCell = '<td><div style="display:flex;flex-direction:column;align-items:center">' + rfAmt + adminEditBadge + '</div></td>';
 
     var rc = '';
@@ -239,15 +237,19 @@ function rnT() {
           ' <span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:7px;font-size:8px;font-weight:800;background:rgba(220,53,69,.15);color:#dc3545;border:1px solid rgba(220,53,69,.3)"><i class="fa-solid fa-copy" style="font-size:7px"></i> مكرر</span></span></td>'
       : '<td><span class="num" dir="ltr" style="font-size:12px">'+ph+'</span></td>';
 
-    // نوع الباقة — شارة "مباشر" للاسترداد المباشر
-    var pkCell = isDirect
-      ? '<td><span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;background:rgba(233,122,42,.1);color:#e97a2a;border:1px solid rgba(233,122,42,.2)"><i class="fa-solid fa-money-bill-wave" style="font-size:8px"></i> مباشر</span></td>'
-      : '<td class="text-[11px] whitespace-nowrap" style="color:var(--dm)">'+esc(c.packageType||'—')+'</td>';
+    // عمود نوع الاسترداد
+    var rtCell = isDirect
+      ? '<td><span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;background:rgba(233,122,42,.1);color:#e97a2a;border:1px solid rgba(233,122,42,.2)"><i class="fa-solid fa-money-bill-wave" style="font-size:7px"></i> مباشر</span></td>'
+      : '<td><span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;background:rgba(0,212,170,.08);color:#00d4aa;border:1px solid rgba(0,212,170,.18)"><i class="fa-solid fa-rotate-left" style="font-size:7px"></i> اشتراك</span></td>';
+
+    // عمود نوع الباقة — يظهر القيمة لكلا النوعين (أو — إن فارغة)
+    var pkCell = '<td class="text-[11px] whitespace-nowrap" style="color:var(--dm)">'+esc(c.packageType||'—')+'</td>';
 
     return '<tr class="rn '+(c.previouslyRefunded?'pr':'')+'">' +
       '<td class="font-bold text-[13px] num">'+(i+1)+'</td>' +
       '<td>'+esc(c.name)+(c.previouslyRefunded?' <span class="pb-t"><i class="fa-solid fa-triangle-exclamation"></i> سبق</span>':'')+'</td>' +
       phCell +
+      rtCell +
       '<td class="text-[11px] whitespace-nowrap" style="color:var(--dm)">'+esc(c.subscriptionDate||'—')+'</td>' +
       pkCell +
       '<td class="num">'+pc+'</td><td class="num">'+dc+'</td><td class="num">'+cc+'</td>' +
@@ -266,12 +268,10 @@ function rnT() {
 
 // ============================
 // Field Updates
-// لو المدير عدّل الخانات الثلاث → يحفظ adminEdited:true
-// لو المستخدم عدّل → لا تغيير على adminEdited
+// لو المدير عدّل الخانات الثلاث → adminEdited: true
 // ============================
 function upF(id, f, v) {
-  var u = {};
-  var isAdmin = cu && cu.role === 'admin';
+  var u = {}, isAdmin = cu && cu.role === 'admin';
   if (f === 'packagePrice' || f === 'packageDays' || f === 'consumedDays') {
     u[f] = parseFloat(v) || 0;
     var c = cls.find(function(x) { return x.id === id; });
@@ -280,11 +280,8 @@ function upF(id, f, v) {
       f==='packageDays'   ? parseFloat(v)||0 : c.packageDays||0,
       f==='consumedDays'  ? parseFloat(v)||0 : c.consumedDays||0
     );
-    // إشارة التعديل من المالية — فقط لو المدير هو من عدّل
     if (isAdmin) u.adminEdited = true;
-  } else {
-    u[f] = v;
-  }
+  } else { u[f] = v; }
   db.collection('cancellations').doc(id).update(u).catch(function() { toast('خطأ في التحديث','e'); });
 }
 function upRf(id, v) {
@@ -333,11 +330,10 @@ function swRT(t) {
   }
   document.getElementById('pW').classList.remove('on');
 }
-
 function openCM() {
   document.getElementById('cmM').classList.add('on');
   ['tmI','fN','fPh','fSub','fPk','fDt','fDr','fPr','fDy','fCo','fRs','fNo',
-   'fDN','fDPh','fDSub','fDRs','fDRA'].forEach(function(id) {
+   'fDN','fDPh','fDSub','fDPk','fDRs','fDRA'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
   document.getElementById('pRf').textContent = '0.00';
@@ -346,7 +342,6 @@ function openCM() {
 }
 function clCM() { document.getElementById('cmM').classList.remove('on'); }
 
-// فحص التكرار — يعمل مع الاثنين
 function chkPD() {
   var n = document.getElementById('fN').value.trim(), p = document.getElementById('fPh').value.trim();
   _chkDup(n, p);
@@ -365,11 +360,8 @@ function _chkDup(n, p) {
   if (d) {
     document.getElementById('pW').classList.add('on');
     document.getElementById('pWT').textContent = 'تحذير: العميل موجود مسبقاً (' + esc(d.name) + ')';
-  } else {
-    document.getElementById('pW').classList.remove('on');
-  }
+  } else { document.getElementById('pW').classList.remove('on'); }
 }
-
 function uPv() {
   var p = parseFloat(document.getElementById('fPr').value)||0;
   var d = parseFloat(document.getElementById('fDy').value)||0;
@@ -423,15 +415,16 @@ function addC() {
   if (isDirect) {
     var n      = document.getElementById('fDN').value.trim();
     var ph     = document.getElementById('fDPh').value.trim();
-    var drs    = document.getElementById('fDRs').value.trim();
     var dsub   = document.getElementById('fDSub').value.trim();
+    var dpk    = document.getElementById('fDPk').value.trim();
+    var drs    = document.getElementById('fDRs').value.trim();
     var draStr = document.getElementById('fDRA').value.trim();
     var dra    = parseFloat(draStr) || 0;
 
-    if (!n)                   { toast('أدخل اسم العميل','e'); return; }
-    if (!ph)                  { toast('أدخل الرقم','e'); return; }
-    if (!drs)                 { toast('أدخل سبب الاسترداد','e'); return; }
-    if (!draStr || dra <= 0)  { toast('أدخل المبلغ المسترد','e'); return; }
+    if (!n)                  { toast('أدخل اسم العميل','e'); return; }
+    if (!ph)                 { toast('أدخل الرقم','e'); return; }
+    if (!drs)                { toast('أدخل سبب الاسترداد','e'); return; }
+    if (!draStr || dra <= 0) { toast('أدخل المبلغ المسترد','e'); return; }
 
     var prevRef = cls.some(function(x) {
       var xph = (x.phone || x.mobile || '').trim();
@@ -442,7 +435,8 @@ function addC() {
       name: n, phone: ph, mobile: ph,
       refundType: 'direct',
       subscriptionDate: normDateStr(dsub),
-      packageType: '', cancelDate: '', cancellationPeriod: '',
+      packageType: dpk,   // اختياري — قد يكون فارغ
+      cancelDate: '', cancellationPeriod: '',
       packagePrice: 0, packageDays: 0, consumedDays: 0,
       refundAmount: dra, cancelReason: drs, notes: no,
       status: 'uploaded', refunded: false,
@@ -467,9 +461,7 @@ function addC() {
   var prStr = document.getElementById('fPr').value.trim();
   var dyStr = document.getElementById('fDy').value.trim();
   var coStr = document.getElementById('fCo').value.trim();
-  var pr = parseFloat(prStr) || 0;
-  var dy = parseFloat(dyStr) || 0;
-  var co = parseFloat(coStr) || 0;
+  var pr = parseFloat(prStr)||0, dy = parseFloat(dyStr)||0, co = parseFloat(coStr)||0;
 
   if (!n)                { toast('أدخل اسم العميل','e'); return; }
   if (!ph)               { toast('أدخل الرقم','e'); return; }
