@@ -229,7 +229,11 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
   else rc='<td><span style="color:var(--mt);font-size:12px">—</span></td>';
 
   var ac = '';
-  if (a) ac='<div style="display:flex;gap:4px;align-items:center"><button type="button" class="bd" onclick="dlC(\''+c.id+'\')" title="حذف"><i class="fa-solid fa-trash-can"></i></button><button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;transition:all .2s" onclick="startEdit(\''+c.id+'\')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button></div>';
+  if (a) {
+    var revertBtn = st==='refunded' ? '<button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.07);color:#f59e0b;transition:all .2s" onclick="revertRefund(\''+c.id+'\')" title="تراجع عن الاسترداد"><i class="fa-solid fa-rotate-right"></i></button>' : '';
+    var clearAEBtn = c.adminEdited ? '<button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;border:1px solid rgba(167,139,250,.2);background:rgba(167,139,250,.06);color:#a78bfa;transition:all .2s" onclick="clearAdminEdited(\''+c.id+'\')" title="إزالة علامة التعديل"><i class="fa-solid fa-eraser"></i></button>' : '';
+    ac='<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><button type="button" class="bd" onclick="dlC(\''+c.id+'\')" title="حذف"><i class="fa-solid fa-trash-can"></i></button><button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;transition:all .2s" onclick="startEdit(\''+c.id+'\')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>'+revertBtn+clearAEBtn+'</div>';
+  }
   else if (st==='uploaded'&&pm.canDelete) ac='<button type="button" class="bd" onclick="dlC(\''+c.id+'\')"><i class="fa-solid fa-trash-can"></i></button>';
   else ac='<span style="color:var(--mt);font-size:10px"><i class="fa-solid fa-lock"></i></span>';
 
@@ -485,51 +489,46 @@ document.addEventListener('keydown', function(e) {
 // ============================
 // ابدأ الاسترداد — تنقل بين قيد المراجعة
 // ============================
-var qvList = []; // عملاء قيد المراجعة مرتبين بالتاريخ
-var qvIdx  = 0;  // الفهرس الحالي
-var qvId   = null;
+var qvList  = [];
+var qvIdx   = 0;
+var qvId    = null;
+var qvDirty = false; // true فقط إذا المستخدم غيّر قيمة فعلاً
 
 function openQV(startId) {
-  // بناء قائمة قيد المراجعة مرتبة من الأقدم للأحدث
   qvList = cls.filter(function(c){ return getSt(c) === 'pending'; })
     .sort(function(a,b){
-      var ta = a.createdAt ? a.createdAt.seconds : 0;
-      var tb = b.createdAt ? b.createdAt.seconds : 0;
-      return ta - tb;
+      return (a.createdAt ? a.createdAt.seconds : 0) - (b.createdAt ? b.createdAt.seconds : 0);
     });
-
   if (!qvList.length) { toast('لا يوجد عملاء قيد المراجعة','w'); return; }
-
-  // ابدأ من العميل المحدد أو من الأول
   if (startId) {
-    var found = qvList.findIndex(function(c){ return c.id === startId; });
-    qvIdx = found >= 0 ? found : 0;
-  } else {
-    qvIdx = 0;
-  }
-
+    var f = qvList.findIndex(function(c){ return c.id === startId; });
+    qvIdx = f >= 0 ? f : 0;
+  } else { qvIdx = 0; }
   document.getElementById('qvM').classList.add('on');
   qvRender();
 }
 
 function clQV() {
   document.getElementById('qvM').classList.remove('on');
-  qvId = null; qvList = []; qvIdx = 0;
+  qvId = null; qvList = []; qvIdx = 0; qvDirty = false;
 }
 
 function qvNav(dir) {
-  // حفظ تلقائي قبل التنقل
-  qvSave(true);
-  qvIdx += dir;
-  if (qvIdx < 0) qvIdx = qvList.length - 1;
-  if (qvIdx >= qvList.length) qvIdx = 0;
+  if (qvDirty) qvSave(true); // حفظ فقط لو في تغيير حقيقي
+  qvIdx = (qvIdx + dir + qvList.length) % qvList.length;
   qvRender();
+}
+
+function qvMarkDirty() {
+  qvDirty = true; // يُستدعى من oninput في الحقول
 }
 
 function qvRender() {
   var c = qvList[qvIdx];
   if (!c) return;
-  qvId = c.id;
+  qvId    = c.id;
+  qvDirty = false; // ← إعادة ضبط عند كل عرض جديد
+
   var isDirect = c.refundType === 'direct';
   var prevRef  = isDynPrevRef(c);
   var rawPh    = (c.phone||c.mobile||'').trim();
@@ -537,14 +536,10 @@ function qvRender() {
   cls.forEach(function(x){ var p=(x.phone||x.mobile||'').trim(); if(p) dupPhones[p]=(dupPhones[p]||0)+1; });
   var isDup = rawPh && dupPhones[rawPh] > 1;
 
-  // العداد
   document.getElementById('qvCounter').textContent = (qvIdx+1) + ' / ' + qvList.length;
-
-  // الأسهم
   document.getElementById('qvPrevBtn').style.opacity = qvList.length > 1 ? '1' : '0.3';
   document.getElementById('qvNextBtn').style.opacity = qvList.length > 1 ? '1' : '0.3';
 
-  // شارات
   var typeEl = document.getElementById('qvType');
   typeEl.textContent = isDirect ? '💵 مباشر' : '🔄 اشتراك';
   typeEl.style.cssText = isDirect
@@ -553,9 +548,9 @@ function qvRender() {
 
   document.getElementById('qvPrev').style.display = prevRef ? 'flex' : 'none';
   document.getElementById('qvDup').style.display  = isDup   ? 'flex' : 'none';
+  // إشارة تعديل المالية — تظهر فقط إذا السجل فيه adminEdited مسبقاً
   document.getElementById('qvAEBadge').style.display = c.adminEdited ? 'flex' : 'none';
 
-  // البيانات
   document.getElementById('qvName').textContent  = c.name||'—';
   document.getElementById('qvPhone').textContent = en(rawPh||'—');
   document.getElementById('qvSub').textContent   = c.subscriptionDate||'—';
@@ -566,23 +561,24 @@ function qvRender() {
   document.getElementById('qvCrd').textContent   = fmtDtT(c.createdAt);
   document.getElementById('qvBy').textContent    = c.addedByUsername||'—';
 
-  // الخانات
   var subFields = document.getElementById('qvSubFields');
+  var refBox    = document.getElementById('qvRefBox');
   if (isDirect) {
     subFields.style.display = 'none';
     document.getElementById('qvRA').readOnly = false;
     document.getElementById('qvRA').style.color = '#e97a2a';
-    document.getElementById('qvRefBox').style.borderColor = 'rgba(233,122,42,.3)';
+    refBox.style.borderColor = 'rgba(233,122,42,.3)';
   } else {
     subFields.style.display = 'block';
-    document.getElementById('qvPr').value = en(c.packagePrice||0);
-    document.getElementById('qvDy').value = en(c.packageDays||0);
-    document.getElementById('qvCo').value = en(c.consumedDays||0);
+    // ← تعيين القيم بدقة بدون en() لتجنب مشاكل المقارنة
+    document.getElementById('qvPr').value = (c.packagePrice||0).toString();
+    document.getElementById('qvDy').value = (c.packageDays||0).toString();
+    document.getElementById('qvCo').value = (c.consumedDays||0).toString();
     document.getElementById('qvRA').readOnly = true;
     document.getElementById('qvRA').style.color = '#00d4aa';
-    document.getElementById('qvRefBox').style.borderColor = 'rgba(0,212,170,.2)';
+    refBox.style.borderColor = 'rgba(0,212,170,.2)';
   }
-  document.getElementById('qvRA').value = en((c.refundAmount||0).toFixed(2));
+  document.getElementById('qvRA').value = (c.refundAmount||0).toFixed(2);
 }
 
 function qvCalc() {
@@ -590,55 +586,40 @@ function qvCalc() {
   var dy=parseFloat(document.getElementById('qvDy').value)||0;
   var co=parseFloat(document.getElementById('qvCo').value)||0;
   document.getElementById('qvRA').value = cRf(pr,dy,co).toFixed(2);
+  qvDirty = true; // المستخدم غيّر قيمة
 }
 
-// حفظ تعديلات الخانات (silent=true لا يغلق الموديل)
-// لا يحفظ ولا يضع adminEdited إلا إذا تغيّرت القيم فعلاً
+// حفظ — لا يُنفَّذ إلا إذا qvDirty = true
 function qvSave(silent) {
-  if (!qvId) return;
+  if (!qvId || !qvDirty) {
+    if (!silent) toast('لا توجد تعديلات','i');
+    return;
+  }
   var c = cls.find(function(x){ return x.id===qvId; });
   if (!c) return;
   var isDirect = c.refundType === 'direct';
-  var u = {}, changed = false;
-
+  var u;
   if (isDirect) {
-    var ra = parseFloat(document.getElementById('qvRA').value)||0;
-    if (Math.abs(ra - (c.refundAmount||0)) > 0.001) {
-      u.refundAmount = ra;
-      u.adminEdited  = true;
-      changed = true;
-    }
+    u = { refundAmount: parseFloat(document.getElementById('qvRA').value)||0, adminEdited: true };
   } else {
-    var pr = parseFloat(document.getElementById('qvPr').value)||0;
-    var dy = parseFloat(document.getElementById('qvDy').value)||0;
-    var co = parseFloat(document.getElementById('qvCo').value)||0;
-    var newRa = cRf(pr, dy, co);
-    if (
-      Math.abs(pr - (c.packagePrice||0)) > 0.001 ||
-      Math.abs(dy - (c.packageDays||0))  > 0.001 ||
-      Math.abs(co - (c.consumedDays||0)) > 0.001
-    ) {
-      u.packagePrice  = pr;
-      u.packageDays   = dy;
-      u.consumedDays  = co;
-      u.refundAmount  = newRa;
-      u.adminEdited   = true;
-      changed = true;
-    }
+    var pr=parseFloat(document.getElementById('qvPr').value)||0;
+    var dy=parseFloat(document.getElementById('qvDy').value)||0;
+    var co=parseFloat(document.getElementById('qvCo').value)||0;
+    u = { packagePrice:pr, packageDays:dy, consumedDays:co, refundAmount:cRf(pr,dy,co), adminEdited:true };
   }
-
-  if (!changed) return; // لا شيء تغيّر — لا نحفظ شيئاً
-
   Object.assign(c, u);
+  qvDirty = false;
   db.collection('cancellations').doc(qvId).update(u)
     .catch(function(e){ toast('خطأ في المزامنة','e'); console.error(e); });
   if (!silent) toast('تم الحفظ','s');
+  // تحديث شارة adminEdited في الموديل
+  document.getElementById('qvAEBadge').style.display = 'flex';
 }
 
-// الموافقة من الموديل
+// موافقة من الموديل
 function qvApprove() {
   if (!qvId) return;
-  qvSave(true);
+  if (qvDirty) qvSave(true);
   var id = qvId;
   db.collection('cancellations').doc(id).update({
     status:'refunded', refunded:true,
@@ -646,11 +627,39 @@ function qvApprove() {
   }).then(function(){
     toast('تم الاسترداد ✓','s');
     ldPd(); chkP();
-    // أزل من القائمة وانتقل للتالي
     qvList = qvList.filter(function(c){ return c.id !== id; });
     if (!qvList.length) { clQV(); toast('تم الانتهاء من جميع الطلبات 🎉','s'); return; }
     if (qvIdx >= qvList.length) qvIdx = 0;
-    qvId = null;
+    qvId = null; qvDirty = false;
     qvRender();
   }).catch(function(){ toast('خطأ','e'); });
+}
+
+// ============================
+// التراجع عن حالة "تم الاسترداد" → قيد المراجعة
+// ============================
+function revertRefund(id) {
+  if (!cu || cu.role !== 'admin') { toast('للمدير فقط','e'); return; }
+  sCf('هل تريد التراجع عن هذا الاسترداد وإرجاعه إلى "قيد المراجعة"؟', function() {
+    db.collection('cancellations').doc(id).update({
+      status: 'pending', refunded: false,
+      refundDate: firebase.firestore.FieldValue.deleteField()
+    }).then(function(){
+      toast('تم التراجع — العميل الآن قيد المراجعة','s');
+      ldPd(); chkP();
+    }).catch(function(e){ toast('خطأ','e'); console.error(e); });
+  });
+}
+
+// ============================
+// إزالة علامة "تم التعديل من المالية"
+// ============================
+function clearAdminEdited(id) {
+  if (!cu || cu.role !== 'admin') return;
+  var c = cls.find(function(x){ return x.id===id; });
+  if (!c) return;
+  c.adminEdited = false;
+  db.collection('cancellations').doc(id).update({ adminEdited: false })
+    .then(function(){ toast('تم إزالة علامة التعديل','s'); rnT(); })
+    .catch(function(){ toast('خطأ','e'); });
 }
