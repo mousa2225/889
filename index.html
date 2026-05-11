@@ -504,6 +504,115 @@ window.addEventListener('DOMContentLoaded', function() {
 </script>
 
 
+<!-- ===================== QUICK VIEW MODAL ===================== -->
+<div class="mo fixed inset-0 z-50 flex items-center justify-center p-3" id="qvM">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="clQV()"></div>
+  <div class="mc relative crd w-full" style="max-width:680px;max-height:92vh;overflow-y:auto">
+
+    <!-- Header -->
+    <div class="sticky top-0 z-10 px-5 py-3 flex items-center justify-between" style="background:var(--cs);border-bottom:1px solid var(--brd)">
+      <div class="flex items-center gap-2">
+        <div id="qvType" class="px-2 py-1 rounded-lg text-[10px] font-bold"></div>
+        <div id="qvPrev" class="px-2 py-1 rounded-lg text-[10px] font-bold" style="display:none;background:rgba(220,53,69,.1);color:#dc3545;border:1px solid rgba(220,53,69,.2)"><i class="fa-solid fa-triangle-exclamation text-[9px]"></i> سبق الاسترداد</div>
+        <div id="qvDup" class="px-2 py-1 rounded-lg text-[10px] font-bold" style="display:none;background:rgba(220,53,69,.08);color:#dc3545;border:1px solid rgba(220,53,69,.15)"><i class="fa-solid fa-copy text-[9px]"></i> رقم مكرر</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="qvSt" class="sb"></div>
+        <button type="button" onclick="clQV()" class="w-7 h-7 rounded-md flex items-center justify-center" style="background:var(--ib);color:var(--dm)"><i class="fa-solid fa-xmark text-xs"></i></button>
+      </div>
+    </div>
+
+    <div class="p-4" id="qvBody">
+
+      <!-- الاسم والرقم -->
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">اسم العميل</div>
+          <div id="qvName" style="font-size:18px;font-weight:900;color:var(--tx)"></div>
+        </div>
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">الرقم</div>
+          <div id="qvPhone" dir="ltr" style="font-size:18px;font-weight:900;color:var(--tx)"></div>
+        </div>
+      </div>
+
+      <!-- التواريخ -->
+      <div class="grid grid-cols-3 gap-2.5 mb-3">
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">تاريخ الاشتراك</div>
+          <div id="qvSub" style="font-size:14px;font-weight:700;color:var(--tx)"></div>
+        </div>
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">تاريخ الإلغاء</div>
+          <div id="qvCdt" style="font-size:14px;font-weight:700;color:var(--tx)"></div>
+        </div>
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">مدة الإلغاء</div>
+          <div id="qvDr" style="font-size:14px;font-weight:700;color:var(--tx)"></div>
+        </div>
+      </div>
+
+      <!-- الباقة والسبب -->
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">نوع الباقة</div>
+          <div id="qvPk" style="font-size:13px;font-weight:700;color:var(--tx)"></div>
+        </div>
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">سبب الإلغاء / الاسترداد</div>
+          <div id="qvRs" style="font-size:13px;font-weight:700;color:var(--tx)"></div>
+        </div>
+      </div>
+
+      <!-- الخانات الثلاث (اشتراك) أو المبلغ المباشر -->
+      <div id="qvSubFields">
+        <div class="grid grid-cols-3 gap-2.5 mb-3">
+          <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid rgba(0,212,170,.2)">
+            <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">المبلغ المدفوع</div>
+            <input id="qvPr" type="number" step="0.01" dir="ltr" oninput="qvCalc()"
+              style="font-size:18px;font-weight:900;color:#00d4aa;width:100%;background:transparent;border:none;outline:none;font-family:Tajawal,sans-serif">
+          </div>
+          <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid rgba(0,212,170,.2)">
+            <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">أيام الباقة</div>
+            <input id="qvDy" type="number" dir="ltr" oninput="qvCalc()"
+              style="font-size:18px;font-weight:900;color:#00d4aa;width:100%;background:transparent;border:none;outline:none;font-family:Tajawal,sans-serif">
+          </div>
+          <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid rgba(0,212,170,.2)">
+            <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">أيام مستهلكة</div>
+            <input id="qvCo" type="number" dir="ltr" oninput="qvCalc()"
+              style="font-size:18px;font-weight:900;color:#00d4aa;width:100%;background:transparent;border:none;outline:none;font-family:Tajawal,sans-serif">
+          </div>
+        </div>
+      </div>
+
+      <!-- المبلغ المسترد -->
+      <div class="rounded-xl p-4 mb-4 flex items-center justify-between" style="background:rgba(0,212,170,.06);border:2px solid rgba(0,212,170,.2)" id="qvRefBox">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--dm)">المبلغ المسترد</div>
+          <div id="qvAEBadge" style="display:none;font-size:8px;color:#a78bfa;margin-top:2px"><i class="fa-solid fa-pen-to-square text-[7px]"></i> تم التعديل من المالية</div>
+        </div>
+        <input id="qvRA" type="number" step="0.01" dir="ltr"
+          style="font-size:28px;font-weight:900;color:#00d4aa;width:160px;background:transparent;border:none;outline:none;text-align:left;font-family:Tajawal,sans-serif">
+      </div>
+
+      <!-- معلومات إضافية -->
+      <div class="grid grid-cols-2 gap-2.5 mb-4">
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">تاريخ الإضافة</div>
+          <div id="qvCrd" style="font-size:12px;font-weight:600;color:var(--dm)"></div>
+        </div>
+        <div class="rounded-xl p-3" style="background:var(--ib);border:1px solid var(--brd)">
+          <div style="font-size:9px;font-weight:700;color:var(--mt);margin-bottom:4px">أضاف بواسطة</div>
+          <div id="qvBy" style="font-size:12px;font-weight:600;color:rgba(0,212,170,.8)"></div>
+        </div>
+      </div>
+
+      <!-- أزرار الإجراء -->
+      <div id="qvActions" class="flex gap-2.5"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== REPORTS MODAL ===================== -->
 <div class="mo fixed inset-0 z-50 flex items-center justify-center p-2" id="rpM">
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="clRP()"></div>
