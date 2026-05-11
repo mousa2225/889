@@ -181,26 +181,65 @@
           <i class="fa-solid fa-file-excel text-success text-xs"></i> تصدير
           <i class="fa-solid fa-chevron-down text-[8px]" style="color:var(--mt)"></i>
         </button>
-        <div class="em" id="exM">
-          <button type="button" class="ei" onclick="expD()">
-            <i class="fa-solid fa-calendar-day text-accent"></i>
-            <div>تصدير اليوم<span class="dd">عملاء أُضيفوا اليوم</span></div>
-          </button>
-          <div class="es"></div>
-          <div style="padding:8px 12px">
-            <div class="text-[10px] font-bold mb-1.5" style="color:var(--dm)">
-              <i class="fa-solid fa-calendar-days ml-1"></i>تصدير بتاريخ
-            </div>
-            <div class="flex gap-1.5">
-              <input type="date" id="exDt" class="fi fi-sm" style="flex:1">
-              <button type="button" onclick="expByDt()" class="bp bp-sm px-3"><i class="fa-solid fa-download"></i></button>
-            </div>
+        <div class="em" id="exM" style="min-width:260px">
+
+          <!-- ══ قسم المستخدم (يظهر للجميع) ══ -->
+          <div id="exUserSec">
+            <div style="padding:7px 12px 3px;font-size:9px;font-weight:800;color:var(--mt);letter-spacing:.5px">تصدير عملاء اليوم</div>
+            <button type="button" class="ei" onclick="expTodayUploaded()">
+              <i class="fa-solid fa-calendar-day text-accent"></i>
+              <div>عملاء اليوم — تم الرفع<span class="dd">المضافون اليوم بحالة "تم الرفع"</span></div>
+            </button>
           </div>
-          <div class="es"></div>
-          <button type="button" class="ei" id="exA" onclick="expA()" style="display:none">
-            <i class="fa-solid fa-database text-warm"></i>
-            <div>تصدير الكل<span class="dd">جميع العملاء</span></div>
-          </button>
+
+          <!-- ══ قسم المدير فقط ══ -->
+          <div id="exAdminSec" style="display:none">
+            <div class="es"></div>
+            <div style="padding:7px 12px 3px;font-size:9px;font-weight:800;color:var(--mt);letter-spacing:.5px">خيارات المدير</div>
+
+            <!-- الحالة -->
+            <div style="padding:4px 12px">
+              <div style="font-size:10px;font-weight:700;color:var(--dm);margin-bottom:4px">الحالة</div>
+              <select id="exSt" class="fi fi-sm">
+                <option value="all">جميع الحالات</option>
+                <option value="uploaded">تم الرفع</option>
+                <option value="pending">قيد المراجعة</option>
+                <option value="refunded">تم الاسترداد</option>
+              </select>
+            </div>
+
+            <!-- حسب -->
+            <div style="padding:4px 12px">
+              <div style="font-size:10px;font-weight:700;color:var(--dm);margin-bottom:4px">حسب تاريخ</div>
+              <select id="exDateFld" class="fi fi-sm">
+                <option value="created">تاريخ الإضافة</option>
+                <option value="subscription">تاريخ الاشتراك</option>
+                <option value="cancel">تاريخ الإلغاء</option>
+                <option value="refund">تاريخ الاسترداد</option>
+              </select>
+            </div>
+
+            <!-- من / إلى -->
+            <div style="padding:4px 12px">
+              <div style="font-size:10px;font-weight:700;color:var(--dm);margin-bottom:4px">الفترة</div>
+              <div class="flex gap-1.5 mb-1.5">
+                <input type="date" id="exFr" class="fi fi-sm" style="flex:1" placeholder="من">
+                <input type="date" id="exTo" class="fi fi-sm" style="flex:1" placeholder="إلى">
+              </div>
+              <button type="button" onclick="expAdmin()" class="bp bp-sm" style="width:100%;justify-content:center">
+                <i class="fa-solid fa-download text-[10px]"></i> تصدير
+              </button>
+            </div>
+
+            <div class="es"></div>
+            <button type="button" class="ei" onclick="expAll()">
+              <i class="fa-solid fa-database text-warm"></i>
+              <div>تصدير الكل<span class="dd">جميع السجلات بدون فلتر</span></div>
+            </button>
+          </div>
+
+          <!-- حقل تاريخ قديم للتوافق -->
+          <input type="date" id="exDt" style="display:none">
         </div>
       </div>
       <!-- User Badge -->

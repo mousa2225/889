@@ -18,6 +18,7 @@ function shApp() {
   document.getElementById('srvClk').style.display = a ? 'flex' : 'none';
   document.getElementById('addBtn').style.display = gP().canAdd ? 'inline-flex' : 'none';
   var rpBtn = document.getElementById('rpBtn'); if (rpBtn) rpBtn.style.display = a ? 'inline-flex' : 'none';
+  setTimeout(initExMenu, 100);
 
   db.collection('settings').doc('appSettings').onSnapshot(function(d) {
     hideTm = d.exists ? (d.data().hideTimeInLogs || false) : false;
