@@ -12,7 +12,7 @@ function shApp() {
   b.textContent = a ? 'مدير' : 'مستخدم';
   b.className = a ? 'rb rb-a' : 'rb rb-u';
   document.getElementById('adB').style.display = a ? 'inline-flex' : 'none';
-  document.getElementById('exA').style.display = a ? 'flex' : 'none';
+  var exAEl = document.getElementById('exA'); if (exAEl) exAEl.style.display = a ? 'flex' : 'none';
   var exSEl = document.getElementById('exS'); if (exSEl) exSEl.style.display = a ? 'block' : 'none';
   var dtFlEl = document.getElementById('dtFl'); if (dtFlEl) dtFlEl.style.display = a ? 'block' : 'none';
   document.getElementById('srvClk').style.display = a ? 'flex' : 'none';
