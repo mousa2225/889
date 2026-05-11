@@ -208,7 +208,7 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
   else rd = '<span style="color:var(--mt);font-size:12px">—</span>';
 
   // الخانات الثلاث: لا تعديل إذا الحالة 'refunded' حتى للمدير
-  var ce = (a && st !== 'refunded') || (st==='uploaded' && pm.canEdit), pc,dc,cc,nc;
+  var ce = (a && st !== 'refunded' && st !== 'rejected') || (st==='uploaded' && pm.canEdit), pc,dc,cc,nc;
   if (!isDirect&&ce) {
     pc = '<input type="number" class="ism num" value="'+en(c.packagePrice||0)+'" step="0.01" dir="ltr" onchange="upF(\''+c.id+'\',\'packagePrice\',this.value)">';
     dc = '<input type="number" class="ism num" value="'+en(c.packageDays||0)+'" dir="ltr" onchange="upF(\''+c.id+'\',\'packageDays\',this.value)">';
@@ -233,7 +233,7 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
   var ac = '';
   if (a) {
     var cid = c.id;
-    var revertBtn = st==='refunded'
+    var revertBtn = (st==='refunded' || st==='rejected')
       ? '<button type="button" data-id="'+cid+'" data-act="revert" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.07);color:#f59e0b" title="تراجع عن الاسترداد"><i class="fa-solid fa-rotate-right"></i></button>'
       : '';
     var clearAEBtn = c.adminEdited
@@ -686,14 +686,19 @@ function qvApprove() {
 // ============================
 function revertRefund(id) {
   if (!cu || cu.role !== 'admin') { toast('للمدير فقط','e'); return; }
-  sCf('هل تريد التراجع عن هذا الاسترداد وإرجاعه إلى "قيد المراجعة"؟', function() {
-    db.collection('cancellations').doc(id).update({
-      status: 'pending', refunded: false,
-      refundDate: firebase.firestore.FieldValue.delete()
-    }).then(function(){
-      toast('تم التراجع — العميل الآن قيد المراجعة','s');
-      ldPd(); chkP();
-    }).catch(function(e){ toast('خطأ','e'); console.error(e); });
+  var c = cls.find(function(x){ return x.id===id; });
+  var isRej = c && getSt(c) === 'rejected';
+  var msg = isRej
+    ? 'هل تريد التراجع عن الرفض وإرجاع الطلب إلى "قيد المراجعة"؟'
+    : 'هل تريد التراجع عن هذا الاسترداد وإرجاعه إلى "قيد المراجعة"؟';
+  sCf(msg, function() {
+    var u = { status: 'pending', refunded: false };
+    if (!isRej) u.refundDate = firebase.firestore.FieldValue.delete();
+    db.collection('cancellations').doc(id).update(u)
+      .then(function(){
+        toast('تم التراجع — العميل الآن قيد المراجعة','s');
+        ldPd(); chkP();
+      }).catch(function(e){ toast('خطأ','e'); console.error(e); });
   });
 }
 
