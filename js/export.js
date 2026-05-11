@@ -205,11 +205,87 @@ function expTodayUploaded() {
     var d = new Date(c.createdAt.seconds * 1000);
     return d >= today && d <= todayEnd;
   });
-  doExport(data,
-    'عملاء تم الرفع — ' + td,
-    'تصدير بواسطة: ' + (cu ? cu.username : '') + ' | التاريخ: ' + td,
-    'رفع_' + td
-  );
+  if (!data.length) { toast('لا توجد بيانات اليوم','w'); return; }
+  doUserExport(data, td);
+}
+
+// ============================
+// تصدير المستخدم — بسيط بدون معلومات حساسة
+// ============================
+function doUserExport(data, dateStr) {
+  var hd = ['#','اسم العميل','الرقم','تاريخ الاشتراك','نوع الباقة',
+            'المبلغ المدفوع','أيام الباقة','أيام مستهلكة','المبلغ المسترد',
+            'تاريخ الإلغاء','مدة الإلغاء','سبب الإلغاء/الاسترداد','ملاحظات'];
+  var cw = [5,24,16,16,24,14,11,11,16,14,12,24,18];
+  try {
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'V-SHAPE';
+    var ws = wb.addWorksheet('البيانات', { views:[{ rightToLeft:true }] });
+    ws.columns = hd.map(function(h,i){ return { header:'', key:h, width:cw[i]||15 }; });
+    ws.spliceRows(1,1);
+
+    // ── عنوان: التاريخ فقط ──
+    var tr = ws.addRow(Array(hd.length).fill(''));
+    tr.height = 36;
+    ws.mergeCells(1, 1, 1, hd.length);
+    tr.getCell(1).value = dateStr;
+    tr.getCell(1).font  = { name:'Tajawal', size:16, bold:true, color:{ argb:'FFFFFFFF' } };
+    tr.getCell(1).fill  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF0D9488' } };
+    tr.getCell(1).alignment = { horizontal:'center', vertical:'middle' };
+
+    // ── صف فراغ ──
+    ws.addRow([]).height = 6;
+
+    // ── رؤوس ──
+    var hr = ws.addRow(hd); hr.height = 26;
+    hr.eachCell(function(cell) {
+      cell.font      = { name:'Tajawal', size:11, bold:true, color:{ argb:'FFFFFFFF' } };
+      cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF0F766E' } };
+      cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+      cell.border    = { bottom:{ style:'medium', color:{ argb:'FF0D9488' } } };
+    });
+
+    // ── بيانات ──
+    data.forEach(function(c, idx) {
+      var row = ws.addRow([
+        idx+1,
+        c.name||'',
+        c.phone||c.mobile||'',
+        c.subscriptionDate||'',
+        c.packageType||'',
+        c.packagePrice||0,
+        c.packageDays||0,
+        c.consumedDays||0,
+        c.refundAmount||0,
+        c.cancelDate||'',
+        c.cancellationPeriod||'',
+        c.cancelReason||'',
+        c.notes||''
+      ]);
+      row.height = 22;
+      row.eachCell(function(cell, col) {
+        cell.font      = { name:'Tajawal', size:11 };
+        cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+        cell.border    = { top:{style:'thin',color:{argb:'FFE2E8F0'}}, bottom:{style:'thin',color:{argb:'FFE2E8F0'}}, left:{style:'thin',color:{argb:'FFE2E8F0'}}, right:{style:'thin',color:{argb:'FFE2E8F0'}} };
+        if (idx % 2 === 1) cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF8FAFC' } };
+        if (col === 9) { // المبلغ المسترد
+          cell.font = { name:'Tajawal', size:11, bold:true, color:{ argb:'FF0F766E' } };
+          cell.numFmt = '#,##0.00';
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: idx%2===0?'FFF0FDF4':'FFE6F9F5' } };
+        }
+        if (col === 6) cell.numFmt = '#,##0.00';
+      });
+    });
+
+    ws.views = [{ state:'frozen', ySplit:3, rightToLeft:true }];
+
+    wb.xlsx.writeBuffer().then(function(buf) {
+      var bl = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var u = URL.createObjectURL(bl), a = document.createElement('a');
+      a.href=u; a.download='استرداد_'+dateStr+'.xlsx'; a.click(); URL.revokeObjectURL(u);
+      toast('تم التصدير — '+data.length+' سجل','s');
+    }).catch(function(e){ toast('خطأ: '+e.message,'e'); });
+  } catch(e){ toast('خطأ في التصدير','e'); console.error(e); }
 }
 
 // ============================

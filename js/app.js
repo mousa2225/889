@@ -716,6 +716,18 @@ function clearAdminEdited(id) {
 }
 
 // ============================
+// رفض من شاشة التمرير السريع
+// ============================
+function qvReject() {
+  if (!qvId) return;
+  if (qvDirty) qvSave(true);
+  openReject(qvId);
+  // بعد الرفض: أزل من القائمة وانتقل للتالي
+  var origConfirm = window._qvRejectConfirm;
+  window._qvRejectConfirm = qvId;
+}
+
+// ============================
 // رفض الطلب
 // ============================
 var rjTargetId = null;
@@ -753,5 +765,12 @@ function confirmReject() {
   }).then(function(){
     toast('تم رفض الطلب','s');
     clRJ(); ldPd(); chkP();
+    // لو الرفض جاء من شاشة التمرير، انتقل للتالي
+    if (window._qvRejectConfirm === id && qvList.length) {
+      qvList = qvList.filter(function(c){ return c.id !== id; });
+      if (!qvList.length) { clQV(); toast('تم الانتهاء من جميع الطلبات 🎉','s'); }
+      else { if (qvIdx >= qvList.length) qvIdx = 0; qvId = null; qvDirty = false; qvRender(); }
+      window._qvRejectConfirm = null;
+    }
   }).catch(function(e){ toast('خطأ','e'); console.error(e); });
 }
