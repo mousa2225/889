@@ -593,21 +593,42 @@ function qvCalc() {
 }
 
 // حفظ تعديلات الخانات (silent=true لا يغلق الموديل)
+// لا يحفظ ولا يضع adminEdited إلا إذا تغيّرت القيم فعلاً
 function qvSave(silent) {
   if (!qvId) return;
   var c = cls.find(function(x){ return x.id===qvId; });
   if (!c) return;
   var isDirect = c.refundType === 'direct';
-  var ra  = parseFloat(document.getElementById('qvRA').value)||0;
-  var u;
+  var u = {}, changed = false;
+
   if (isDirect) {
-    u = { refundAmount: ra, adminEdited: true };
+    var ra = parseFloat(document.getElementById('qvRA').value)||0;
+    if (Math.abs(ra - (c.refundAmount||0)) > 0.001) {
+      u.refundAmount = ra;
+      u.adminEdited  = true;
+      changed = true;
+    }
   } else {
-    var pr=parseFloat(document.getElementById('qvPr').value)||0;
-    var dy=parseFloat(document.getElementById('qvDy').value)||0;
-    var co=parseFloat(document.getElementById('qvCo').value)||0;
-    u = { packagePrice:pr, packageDays:dy, consumedDays:co, refundAmount:cRf(pr,dy,co), adminEdited:true };
+    var pr = parseFloat(document.getElementById('qvPr').value)||0;
+    var dy = parseFloat(document.getElementById('qvDy').value)||0;
+    var co = parseFloat(document.getElementById('qvCo').value)||0;
+    var newRa = cRf(pr, dy, co);
+    if (
+      Math.abs(pr - (c.packagePrice||0)) > 0.001 ||
+      Math.abs(dy - (c.packageDays||0))  > 0.001 ||
+      Math.abs(co - (c.consumedDays||0)) > 0.001
+    ) {
+      u.packagePrice  = pr;
+      u.packageDays   = dy;
+      u.consumedDays  = co;
+      u.refundAmount  = newRa;
+      u.adminEdited   = true;
+      changed = true;
+    }
   }
+
+  if (!changed) return; // لا شيء تغيّر — لا نحفظ شيئاً
+
   Object.assign(c, u);
   db.collection('cancellations').doc(qvId).update(u)
     .catch(function(e){ toast('خطأ في المزامنة','e'); console.error(e); });
