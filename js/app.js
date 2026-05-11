@@ -206,7 +206,8 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
     rd = '<span class="num" style="font-size:11px;color:#22c55e;font-weight:700">'+(ht?fmtDt(c.refundDate):fmtDtT(c.refundDate))+'</span>';
   else rd = '<span style="color:var(--mt);font-size:12px">—</span>';
 
-  var ce = a || (st==='uploaded'&&pm.canEdit), pc,dc,cc,nc;
+  // الخانات الثلاث: لا تعديل إذا الحالة 'refunded' حتى للمدير
+  var ce = (a && st !== 'refunded') || (st==='uploaded' && pm.canEdit), pc,dc,cc,nc;
   if (!isDirect&&ce) {
     pc = '<input type="number" class="ism num" value="'+en(c.packagePrice||0)+'" step="0.01" dir="ltr" onchange="upF(\''+c.id+'\',\'packagePrice\',this.value)">';
     dc = '<input type="number" class="ism num" value="'+en(c.packageDays||0)+'" dir="ltr" onchange="upF(\''+c.id+'\',\'packageDays\',this.value)">';
