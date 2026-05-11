@@ -230,9 +230,18 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
 
   var ac = '';
   if (a) {
-    var revertBtn = st==='refunded' ? '<button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.07);color:#f59e0b;transition:all .2s" onclick="revertRefund(\''+c.id+'\')" title="تراجع عن الاسترداد"><i class="fa-solid fa-rotate-right"></i></button>' : '';
-    var clearAEBtn = c.adminEdited ? '<button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;border:1px solid rgba(167,139,250,.2);background:rgba(167,139,250,.06);color:#a78bfa;transition:all .2s" onclick="clearAdminEdited(\''+c.id+'\')" title="إزالة علامة التعديل"><i class="fa-solid fa-eraser"></i></button>' : '';
-    ac='<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><button type="button" class="bd" onclick="dlC(\''+c.id+'\')" title="حذف"><i class="fa-solid fa-trash-can"></i></button><button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;transition:all .2s" onclick="startEdit(\''+c.id+'\')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>'+revertBtn+clearAEBtn+'</div>';
+    var cid = c.id;
+    var revertBtn = st==='refunded'
+      ? '<button type="button" data-id="'+cid+'" data-act="revert" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.07);color:#f59e0b" title="تراجع عن الاسترداد"><i class="fa-solid fa-rotate-right"></i></button>'
+      : '';
+    var clearAEBtn = c.adminEdited
+      ? '<button type="button" data-id="'+cid+'" data-act="clearae" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;border:1px solid rgba(167,139,250,.2);background:rgba(167,139,250,.06);color:#a78bfa" title="إزالة علامة التعديل"><i class="fa-solid fa-eraser"></i></button>'
+      : '';
+    ac='<div style="display:flex;gap:4px;align-items:center">'
+      +'<button type="button" data-id="'+cid+'" data-act="del" class="bd" title="حذف"><i class="fa-solid fa-trash-can"></i></button>'
+      +'<button type="button" data-id="'+cid+'" data-act="edit" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>'
+      +revertBtn+clearAEBtn
+      +'</div>';
   }
   else if (st==='uploaded'&&pm.canDelete) ac='<button type="button" class="bd" onclick="dlC(\''+c.id+'\')"><i class="fa-solid fa-trash-can"></i></button>';
   else ac='<span style="color:var(--mt);font-size:10px"><i class="fa-solid fa-lock"></i></span>';
@@ -476,6 +485,21 @@ function addC() {
 }
 
 // ============================
+// Table Click Delegation — يتعامل مع كل أزرار الجدول
+// ============================
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  var id  = btn.getAttribute('data-id');
+  var act = btn.getAttribute('data-act');
+  if (!id || !act) return;
+  if      (act === 'del')     dlC(id);
+  else if (act === 'edit')    startEdit(id);
+  else if (act === 'revert')  revertRefund(id);
+  else if (act === 'clearae') clearAdminEdited(id);
+});
+
+// ============================
 // Export Menu
 // ============================
 function togEm() { document.getElementById('exM').classList.toggle('on'); }
@@ -643,7 +667,7 @@ function revertRefund(id) {
   sCf('هل تريد التراجع عن هذا الاسترداد وإرجاعه إلى "قيد المراجعة"؟', function() {
     db.collection('cancellations').doc(id).update({
       status: 'pending', refunded: false,
-      refundDate: firebase.firestore.FieldValue.deleteField()
+      refundDate: firebase.firestore.FieldValue.delete()
     }).then(function(){
       toast('تم التراجع — العميل الآن قيد المراجعة','s');
       ldPd(); chkP();
