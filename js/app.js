@@ -18,6 +18,7 @@ function shApp() {
   document.getElementById('srvClk').style.display = a ? 'flex' : 'none';
   document.getElementById('addBtn').style.display = gP().canAdd ? 'inline-flex' : 'none';
   var rpBtn = document.getElementById('rpBtn'); if (rpBtn) rpBtn.style.display = a ? 'inline-flex' : 'none';
+  var srBtn = document.getElementById('startRfBtn'); if (srBtn) srBtn.style.display = a ? 'inline-flex' : 'none';
   setTimeout(initExMenu, 100);
 
   db.collection('settings').doc('appSettings').onSnapshot(function(d) {
@@ -131,6 +132,9 @@ function upSt() {
   var pn = cls.filter(function(c) { return getSt(c)==='pending'; }), pa = pn.reduce(function(s,c) { return s+(c.refundAmount||0); }, 0);
   var up = cls.filter(function(c) { return getSt(c)==='uploaded'; });
   document.getElementById('sT').textContent  = en(t);
+  // بادج ابدأ الاسترداد
+  var srBdg = document.getElementById('pendRfBdg');
+  if (srBdg) { var pnCnt=cls.filter(function(c){return getSt(c)==='pending';}).length; srBdg.textContent=pnCnt; srBdg.style.display=pnCnt>0?'flex':'none'; }
   document.getElementById('sU').textContent  = en(up.length);
   document.getElementById('sTR').textContent = en(tr.toFixed(2));
   document.getElementById('sR').textContent  = en(rf.length);
@@ -225,7 +229,7 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
   else rc='<td><span style="color:var(--mt);font-size:12px">—</span></td>';
 
   var ac = '';
-  if (a) ac='<div style="display:flex;gap:4px;align-items:center"><button type="button" class="bd" onclick="dlC(\''+c.id+'\')" title="حذف"><i class="fa-solid fa-trash-can"></i></button><button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;transition:all .2s" onclick="startEdit(\''+c.id+'\')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button><button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(0,212,170,.25);background:rgba(0,212,170,.07);color:#00d4aa;transition:all .2s" onclick="openQV(\''+c.id+'\')" title="عرض سريع"><i class="fa-solid fa-eye"></i></button></div>';
+  if (a) ac='<div style="display:flex;gap:4px;align-items:center"><button type="button" class="bd" onclick="dlC(\''+c.id+'\')" title="حذف"><i class="fa-solid fa-trash-can"></i></button><button type="button" style="width:28px;height:28px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;transition:all .2s" onclick="startEdit(\''+c.id+'\')" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button></div>';
   else if (st==='uploaded'&&pm.canDelete) ac='<button type="button" class="bd" onclick="dlC(\''+c.id+'\')"><i class="fa-solid fa-trash-can"></i></button>';
   else ac='<span style="color:var(--mt);font-size:10px"><i class="fa-solid fa-lock"></i></span>';
 
@@ -479,91 +483,108 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ============================
-// Quick View Modal — للمدير فقط
+// ابدأ الاسترداد — تنقل بين قيد المراجعة
 // ============================
-var qvId = null;
+var qvList = []; // عملاء قيد المراجعة مرتبين بالتاريخ
+var qvIdx  = 0;  // الفهرس الحالي
+var qvId   = null;
 
-function openQV(id) {
-  var c = cls.find(function(x){ return x.id === id; });
+function openQV(startId) {
+  // بناء قائمة قيد المراجعة مرتبة من الأقدم للأحدث
+  qvList = cls.filter(function(c){ return getSt(c) === 'pending'; })
+    .sort(function(a,b){
+      var ta = a.createdAt ? a.createdAt.seconds : 0;
+      var tb = b.createdAt ? b.createdAt.seconds : 0;
+      return ta - tb;
+    });
+
+  if (!qvList.length) { toast('لا يوجد عملاء قيد المراجعة','w'); return; }
+
+  // ابدأ من العميل المحدد أو من الأول
+  if (startId) {
+    var found = qvList.findIndex(function(c){ return c.id === startId; });
+    qvIdx = found >= 0 ? found : 0;
+  } else {
+    qvIdx = 0;
+  }
+
+  document.getElementById('qvM').classList.add('on');
+  qvRender();
+}
+
+function clQV() {
+  document.getElementById('qvM').classList.remove('on');
+  qvId = null; qvList = []; qvIdx = 0;
+}
+
+function qvNav(dir) {
+  // حفظ تلقائي قبل التنقل
+  qvSave(true);
+  qvIdx += dir;
+  if (qvIdx < 0) qvIdx = qvList.length - 1;
+  if (qvIdx >= qvList.length) qvIdx = 0;
+  qvRender();
+}
+
+function qvRender() {
+  var c = qvList[qvIdx];
   if (!c) return;
-  qvId = id;
-  var st = getSt(c), isDirect = c.refundType === 'direct';
-  var prevRef = isDynPrevRef(c);
-  var rawPh = (c.phone||c.mobile||'').trim();
+  qvId = c.id;
+  var isDirect = c.refundType === 'direct';
+  var prevRef  = isDynPrevRef(c);
+  var rawPh    = (c.phone||c.mobile||'').trim();
   var dupPhones = {};
   cls.forEach(function(x){ var p=(x.phone||x.mobile||'').trim(); if(p) dupPhones[p]=(dupPhones[p]||0)+1; });
   var isDup = rawPh && dupPhones[rawPh] > 1;
 
-  // شارات الأعلى
+  // العداد
+  document.getElementById('qvCounter').textContent = (qvIdx+1) + ' / ' + qvList.length;
+
+  // الأسهم
+  document.getElementById('qvPrevBtn').style.opacity = qvList.length > 1 ? '1' : '0.3';
+  document.getElementById('qvNextBtn').style.opacity = qvList.length > 1 ? '1' : '0.3';
+
+  // شارات
   var typeEl = document.getElementById('qvType');
-  typeEl.textContent = isDirect ? '💵 استرداد مباشر' : '🔄 استرداد اشتراك';
+  typeEl.textContent = isDirect ? '💵 مباشر' : '🔄 اشتراك';
   typeEl.style.cssText = isDirect
     ? 'background:rgba(233,122,42,.1);color:#e97a2a;border:1px solid rgba(233,122,42,.2);padding:3px 10px;border-radius:8px;font-size:10px;font-weight:800'
     : 'background:rgba(0,212,170,.1);color:#00d4aa;border:1px solid rgba(0,212,170,.2);padding:3px 10px;border-radius:8px;font-size:10px;font-weight:800';
 
-  document.getElementById('qvPrev').style.display = prevRef ? 'block' : 'none';
-  document.getElementById('qvDup').style.display  = isDup  ? 'block' : 'none';
-
-  // الحالة
-  var stEl = document.getElementById('qvSt');
-  stEl.className = 'sb ' + STC[st];
-  stEl.innerHTML = '<i class="'+STI[st]+' ml-0.5" style="font-size:9px"></i> ' + STL[st];
+  document.getElementById('qvPrev').style.display = prevRef ? 'flex' : 'none';
+  document.getElementById('qvDup').style.display  = isDup   ? 'flex' : 'none';
+  document.getElementById('qvAEBadge').style.display = c.adminEdited ? 'flex' : 'none';
 
   // البيانات
-  document.getElementById('qvName').textContent  = c.name || '—';
+  document.getElementById('qvName').textContent  = c.name||'—';
   document.getElementById('qvPhone').textContent = en(rawPh||'—');
-  document.getElementById('qvSub').textContent   = c.subscriptionDate || '—';
-  document.getElementById('qvCdt').textContent   = c.cancelDate || '—';
-  document.getElementById('qvDr').textContent    = c.cancellationPeriod || '—';
-  document.getElementById('qvPk').textContent    = c.packageType || '—';
-  document.getElementById('qvRs').textContent    = c.cancelReason || '—';
+  document.getElementById('qvSub').textContent   = c.subscriptionDate||'—';
+  document.getElementById('qvCdt').textContent   = c.cancelDate||'—';
+  document.getElementById('qvDr').textContent    = c.cancellationPeriod||'—';
+  document.getElementById('qvPk').textContent    = c.packageType||'—';
+  document.getElementById('qvRs').textContent    = c.cancelReason||'—';
   document.getElementById('qvCrd').textContent   = fmtDtT(c.createdAt);
-  document.getElementById('qvBy').textContent    = c.addedByUsername || '—';
-  document.getElementById('qvAEBadge').style.display = c.adminEdited ? 'block' : 'none';
+  document.getElementById('qvBy').textContent    = c.addedByUsername||'—';
 
-  // الخانات الثلاث أو المباشر
+  // الخانات
   var subFields = document.getElementById('qvSubFields');
-  var refBox    = document.getElementById('qvRefBox');
   if (isDirect) {
     subFields.style.display = 'none';
-    refBox.style.borderColor = 'rgba(233,122,42,.3)';
-    document.getElementById('qvRA').style.color = '#e97a2a';
     document.getElementById('qvRA').readOnly = false;
+    document.getElementById('qvRA').style.color = '#e97a2a';
+    document.getElementById('qvRefBox').style.borderColor = 'rgba(233,122,42,.3)';
   } else {
     subFields.style.display = 'block';
     document.getElementById('qvPr').value = en(c.packagePrice||0);
     document.getElementById('qvDy').value = en(c.packageDays||0);
     document.getElementById('qvCo').value = en(c.consumedDays||0);
-    refBox.style.borderColor = 'rgba(0,212,170,.2)';
+    document.getElementById('qvRA').readOnly = true;
     document.getElementById('qvRA').style.color = '#00d4aa';
-    document.getElementById('qvRA').readOnly = true; // يُحسب تلقائياً
+    document.getElementById('qvRefBox').style.borderColor = 'rgba(0,212,170,.2)';
   }
   document.getElementById('qvRA').value = en((c.refundAmount||0).toFixed(2));
-
-  // أزرار الإجراء
-  var actEl = document.getElementById('qvActions');
-  var btns = '';
-
-  if (st === 'pending') {
-    btns += '<button type="button" onclick="qvApprove()" style="flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:800;border:none;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-family:Tajawal,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px rgba(34,197,94,.3)">'
-           + '<i class="fa-solid fa-circle-check"></i> تم الاسترداد</button>';
-  }
-  if (st === 'uploaded') {
-    btns += '<button type="button" onclick="qvApprove()" style="flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:800;border:none;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-family:Tajawal,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 16px rgba(34,197,94,.3)">'
-           + '<i class="fa-solid fa-circle-check"></i> تم الاسترداد</button>';
-  }
-  btns += '<button type="button" onclick="qvSave()" style="padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:rgba(0,212,170,.12);color:#00d4aa;font-family:Tajawal,sans-serif;display:flex;align-items:center;gap:5px">'
-        + '<i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات</button>';
-  btns += '<button type="button" onclick="clQV()" style="padding:12px 16px;border-radius:12px;font-size:13px;font-weight:700;border:1px solid var(--brd);cursor:pointer;background:var(--ib);color:var(--mt);font-family:Tajawal,sans-serif">'
-        + '<i class="fa-solid fa-xmark"></i></button>';
-
-  actEl.innerHTML = btns;
-  document.getElementById('qvM').classList.add('on');
 }
 
-function clQV() { document.getElementById('qvM').classList.remove('on'); qvId = null; }
-
-// حساب تلقائي للاشتراك
 function qvCalc() {
   var pr=parseFloat(document.getElementById('qvPr').value)||0;
   var dy=parseFloat(document.getElementById('qvDy').value)||0;
@@ -571,33 +592,44 @@ function qvCalc() {
   document.getElementById('qvRA').value = cRf(pr,dy,co).toFixed(2);
 }
 
-// حفظ من القراءة السريعة
-function qvSave() {
+// حفظ تعديلات الخانات (silent=true لا يغلق الموديل)
+function qvSave(silent) {
   if (!qvId) return;
   var c = cls.find(function(x){ return x.id===qvId; });
   if (!c) return;
   var isDirect = c.refundType === 'direct';
-  var pr=parseFloat(document.getElementById('qvPr')?document.getElementById('qvPr').value:0)||0;
-  var dy=parseFloat(document.getElementById('qvDy')?document.getElementById('qvDy').value:0)||0;
-  var co=parseFloat(document.getElementById('qvCo')?document.getElementById('qvCo').value:0)||0;
-  var ra=parseFloat(document.getElementById('qvRA').value)||0;
-  var u = isDirect
-    ? { refundAmount: ra, adminEdited: true }
-    : { packagePrice: pr, packageDays: dy, consumedDays: co, refundAmount: cRf(pr,dy,co), adminEdited: true };
-  // Optimistic
+  var ra  = parseFloat(document.getElementById('qvRA').value)||0;
+  var u;
+  if (isDirect) {
+    u = { refundAmount: ra, adminEdited: true };
+  } else {
+    var pr=parseFloat(document.getElementById('qvPr').value)||0;
+    var dy=parseFloat(document.getElementById('qvDy').value)||0;
+    var co=parseFloat(document.getElementById('qvCo').value)||0;
+    u = { packagePrice:pr, packageDays:dy, consumedDays:co, refundAmount:cRf(pr,dy,co), adminEdited:true };
+  }
   Object.assign(c, u);
-  toast('تم حفظ التعديلات','s');
-  clQV();
   db.collection('cancellations').doc(qvId).update(u)
     .catch(function(e){ toast('خطأ في المزامنة','e'); console.error(e); });
+  if (!silent) toast('تم الحفظ','s');
 }
 
-// الموافقة على الاسترداد من القراءة السريعة
+// الموافقة من الموديل
 function qvApprove() {
   if (!qvId) return;
-  // Save any pending changes first
-  qvSave();
-  setTimeout(function(){
-    apR(qvId);
-  }, 100);
+  qvSave(true);
+  var id = qvId;
+  db.collection('cancellations').doc(id).update({
+    status:'refunded', refunded:true,
+    refundDate: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    toast('تم الاسترداد ✓','s');
+    ldPd(); chkP();
+    // أزل من القائمة وانتقل للتالي
+    qvList = qvList.filter(function(c){ return c.id !== id; });
+    if (!qvList.length) { clQV(); toast('تم الانتهاء من جميع الطلبات 🎉','s'); return; }
+    if (qvIdx >= qvList.length) qvIdx = 0;
+    qvId = null;
+    qvRender();
+  }).catch(function(){ toast('خطأ','e'); });
 }
