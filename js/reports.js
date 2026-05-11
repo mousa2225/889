@@ -50,7 +50,7 @@ function rpDestCharts() {
 
 // ── KPI Cards ──
 function rpKPI(data) {
-  var total = data.length;
+  var total    = data.length;
   var refunded = data.filter(function(c){ return getSt(c)==='refunded'; });
   var pending  = data.filter(function(c){ return getSt(c)==='pending'; });
   var uploaded = data.filter(function(c){ return getSt(c)==='uploaded'; });
@@ -59,14 +59,21 @@ function rpKPI(data) {
   var totalAmt = data.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
   var refAmt   = refunded.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
   var pendAmt  = pending.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
+  var upAmt    = uploaded.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
   var prevRef  = data.filter(function(c){ return isDynPrevRef(c); });
 
   var kv = {
-    rpK1: total, rpK2: en(totalAmt.toFixed(2))+' ريال',
-    rpK3: refunded.length, rpK4: en(refAmt.toFixed(2))+' ريال',
-    rpK5: pending.length, rpK6: en(pendAmt.toFixed(2))+' ريال',
-    rpK7: uploaded.length, rpK8: prevRef.length,
-    rpK9: sub.length, rpK10: direct.length
+    rpK1:  total,
+    rpK2:  en(totalAmt.toFixed(2))+' ريال',
+    rpK3:  refunded.length,
+    rpK4:  en(refAmt.toFixed(2))+' ريال',
+    rpK5:  pending.length,
+    rpK6:  en(pendAmt.toFixed(2))+' ريال',
+    rpK7:  uploaded.length,
+    rpK8:  prevRef.length,
+    rpK9:  sub.length,
+    rpK10: direct.length,
+    rpK11: en(upAmt.toFixed(2))+' ريال'
   };
   Object.keys(kv).forEach(function(id){ var el=document.getElementById(id); if(el) el.textContent=kv[id]; });
 }
