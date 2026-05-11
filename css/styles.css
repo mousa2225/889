@@ -26,7 +26,7 @@ textarea.fi{resize:vertical;min-height:80px}
 .tbl th{background:var(--cs);padding:8px 6px;font-weight:700;font-size:10px;color:#00d4aa;text-align:right;white-space:nowrap;border-bottom:2px solid rgba(0,212,170,.25);position:sticky;top:0;z-index:5;box-shadow:0 2px 8px var(--sh)}
 .tbl td{padding:7px 6px;font-size:11.5px;border-bottom:1px solid var(--brd);vertical-align:middle;white-space:nowrap}
 .tbl tr:hover td{background:var(--hv)}
-.tbl tr.pr td{background:rgba(220,53,69,.04)}
+.tbl tr.pr td{background:rgba(220,53,69,.04)}.tbl tr.rj td{background:rgba(220,53,69,.03)}
 .tbl tr.pr:hover td{background:rgba(220,53,69,.07)}
 .ism{background:var(--ib);border:1px solid var(--brd);border-radius:6px;padding:3px 5px;color:var(--tx);font-family:'Tajawal',sans-serif;font-size:11.5px;width:60px;text-align:center;outline:none;transition:border-color .2s}
 .ism:focus{border-color:#00d4aa}
@@ -37,7 +37,7 @@ textarea.fi{resize:vertical;min-height:80px}
 .rv{color:#00d4aa;font-weight:800;font-size:12px;font-feature-settings:'tnum'}
 .pb-t{display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:7px;font-size:8px;font-weight:700;background:rgba(220,53,69,.1);color:#dc3545;border:1px solid rgba(220,53,69,.18)}
 .sb{padding:3px 9px;border-radius:14px;font-size:9.5px;font-weight:700;border:2px solid transparent;white-space:nowrap;font-family:'Tajawal',sans-serif;background:none;display:inline-flex;align-items:center;gap:2px}
-.sb-p{color:#e97a2a;border-color:rgba(233,122,42,.25)}.sb-d{color:#22c55e;border-color:rgba(34,197,94,.25)}.sb-u{color:#94a3b8;border-color:rgba(148,163,184,.25)}
+.sb-p{color:#e97a2a;border-color:rgba(233,122,42,.25)}.sb-d{color:#22c55e;border-color:rgba(34,197,94,.25)}.sb-u{color:#94a3b8;border-color:rgba(148,163,184,.25)}.sb-r{color:#dc3545;border-color:rgba(220,53,69,.3)}
 .sb-click{cursor:pointer;transition:all .2s}.sb-click:hover{transform:scale(1.05);filter:brightness(1.2)}
 .bp{background:linear-gradient(135deg,#00d4aa,#00a88a);color:#0b1120;font-weight:800;padding:10px 22px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-family:'Tajawal',sans-serif;transition:all .2s;box-shadow:0 3px 14px rgba(0,212,170,.18);display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .bp:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,212,170,.25)}.bp:disabled{opacity:.4;cursor:not-allowed;transform:none}

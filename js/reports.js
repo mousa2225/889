@@ -41,6 +41,8 @@ function rpRender() {
   rpChartDaily(data);
   rpChartReasons(data);
   rpChartUsers(data);
+  rpChartDiff(data);
+  rpTableDiff(data);
   rpTableTopClients(data);
 }
 
@@ -54,6 +56,7 @@ function rpKPI(data) {
   var refunded = data.filter(function(c){ return getSt(c)==='refunded'; });
   var pending  = data.filter(function(c){ return getSt(c)==='pending'; });
   var uploaded = data.filter(function(c){ return getSt(c)==='uploaded'; });
+  var rejected = data.filter(function(c){ return getSt(c)==='rejected'; });
   var direct   = data.filter(function(c){ return c.refundType==='direct'; });
   var sub      = data.filter(function(c){ return c.refundType!=='direct'; });
   var totalAmt = data.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
@@ -61,6 +64,9 @@ function rpKPI(data) {
   var pendAmt  = pending.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
   var upAmt    = uploaded.reduce(function(s,c){ return s+(c.refundAmount||0); },0);
   var prevRef  = data.filter(function(c){ return isDynPrevRef(c); });
+  // فروقات التعديل
+  var diffRecs = data.filter(function(c){ return c.adminEdited && c.originalRefundAmount !== undefined && c.originalRefundAmount !== null; });
+  var totalDiff= diffRecs.reduce(function(s,c){ return s + Math.abs((c.originalRefundAmount||0)-(c.refundAmount||0)); }, 0);
 
   var kv = {
     rpK1:  total,
@@ -73,7 +79,9 @@ function rpKPI(data) {
     rpK8:  prevRef.length,
     rpK9:  sub.length,
     rpK10: direct.length,
-    rpK11: en(upAmt.toFixed(2))+' ريال'
+    rpK11: en(upAmt.toFixed(2))+' ريال',
+    rpK12: rejected.length,
+    rpK13: diffRecs.length + ' سجل | ' + en(totalDiff.toFixed(2)) + ' ريال'
   };
   Object.keys(kv).forEach(function(id){ var el=document.getElementById(id); if(el) el.textContent=kv[id]; });
 }
@@ -85,11 +93,12 @@ function rpChartStatus(data) {
   var up=data.filter(function(c){return getSt(c)==='uploaded';}).length;
   var ctx=document.getElementById('rpCStatus'); if(!ctx) return;
   var isDk = document.documentElement.className !== 'lt';
+  var rj=data.filter(function(c){return getSt(c)==='rejected';}).length;
   rpCharts.status = new Chart(ctx, {
     type:'doughnut',
     data:{
-      labels:['تم الاسترداد','قيد المراجعة','تم الرفع'],
-      datasets:[{data:[rf,pn,up],backgroundColor:['#22c55e','#e97a2a','#64748b'],borderWidth:0,hoverOffset:6}]
+      labels:['تم الاسترداد','قيد المراجعة','تم الرفع','مرفوض'],
+      datasets:[{data:[rf,pn,up,rj],backgroundColor:['#22c55e','#e97a2a','#64748b','#dc3545'],borderWidth:0,hoverOffset:6}]
     },
     options:{
       responsive:true, maintainAspectRatio:false,
@@ -228,6 +237,69 @@ function rpChartUsers(data) {
       }
     }
   });
+}
+
+// ── Chart: فروقات التعديلات المالية ──
+function rpChartDiff(data) {
+  var ctx = document.getElementById('rpCDiff'); if (!ctx) return;
+  var isDk = document.documentElement.className !== 'lt';
+  var recs = data.filter(function(c){
+    return c.adminEdited && c.originalRefundAmount !== undefined && c.originalRefundAmount !== null
+      && Math.abs((c.originalRefundAmount||0)-(c.refundAmount||0)) > 0.001;
+  }).slice(0, 10);
+  if (!recs.length) {
+    ctx.parentElement.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px"><i class="fa-solid fa-check-circle" style="color:#22c55e;font-size:20px;display:block;margin-bottom:8px"></i>لا توجد فروقات تعديل</div>';
+    return;
+  }
+  var labels = recs.map(function(c){ return c.name ? c.name.substring(0,12) : c.id.substring(0,8); });
+  var origVals = recs.map(function(c){ return Math.round((c.originalRefundAmount||0)*100)/100; });
+  var newVals  = recs.map(function(c){ return Math.round((c.refundAmount||0)*100)/100; });
+  var diffs    = recs.map(function(c){ return Math.round(Math.abs((c.originalRefundAmount||0)-(c.refundAmount||0))*100)/100; });
+  rpCharts.diff = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: labels,
+      datasets:[
+        {label:'المبلغ الأصلي', data:origVals, backgroundColor:'rgba(96,165,250,.7)', borderRadius:4},
+        {label:'بعد التعديل',   data:newVals,  backgroundColor:'rgba(0,212,170,.7)',  borderRadius:4},
+        {label:'الفرق',         data:diffs,    backgroundColor:'rgba(245,158,11,.7)', borderRadius:4}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:isDk?'#94a3b8':'#475569',font:{family:'Tajawal',size:10}}}},
+      scales:{
+        x:{ticks:{color:isDk?'#94a3b8':'#475569',font:{family:'Tajawal',size:9}},grid:{display:false}},
+        y:{ticks:{color:isDk?'#64748b':'#94a3b8',font:{family:'Tajawal',size:9}},grid:{color:isDk?'rgba(255,255,255,.04)':'rgba(0,0,0,.04)'}}
+      }
+    }
+  });
+}
+
+// ── جدول فروقات التعديلات ──
+function rpTableDiff(data) {
+  var tbody = document.getElementById('rpDiffBody'); if (!tbody) return;
+  var recs = data.filter(function(c){
+    return c.adminEdited && c.originalRefundAmount !== undefined && c.originalRefundAmount !== null
+      && Math.abs((c.originalRefundAmount||0)-(c.refundAmount||0)) > 0.001;
+  });
+  if (!recs.length) {
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--mt);font-size:12px"><i class="fa-solid fa-check-circle" style="color:#22c55e"></i> لا توجد فروقات</td></tr>';
+    return;
+  }
+  tbody.innerHTML = recs.map(function(c){
+    var orig = c.originalRefundAmount||0, curr = c.refundAmount||0, diff = curr-orig;
+    var dcolor = diff < 0 ? '#22c55e' : '#dc3545';
+    var dsign  = diff < 0 ? '▼ ' : '▲ ';
+    return '<tr style="border-bottom:1px solid var(--brd)">'
+      +'<td style="padding:6px 8px;font-size:11px;font-weight:600">'+esc(c.name)+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px" dir="ltr">'+esc(c.phone||c.mobile||'—')+'</td>'
+      +'<td style="padding:6px 8px;font-size:12px;font-weight:700;color:#94a3b8;text-decoration:line-through">'+en(orig.toFixed(2))+'</td>'
+      +'<td style="padding:6px 8px;font-size:12px;font-weight:800;color:#00d4aa">'+en(curr.toFixed(2))+'</td>'
+      +'<td style="padding:6px 8px;font-size:12px;font-weight:800;color:'+dcolor+'">'+dsign+en(Math.abs(diff).toFixed(2))+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px;color:var(--dm)">'+esc(c.addedByUsername||'—')+'</td>'
+      +'</tr>';
+  }).join('');
 }
 
 // ── جدول العملاء المكررين ──

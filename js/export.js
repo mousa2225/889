@@ -55,8 +55,8 @@ function doExport(data, title, subtitle, filename) {
   var hd = ['#','اسم العميل','الرقم','نوع الاسترداد','تاريخ الاشتراك','نوع الباقة',
             'المبلغ المدفوع','أيام الباقة','أيام مستهلكة','المبلغ المسترد',
             'تاريخ الإلغاء','مدة الإلغاء','سبب الإلغاء/الاسترداد',
-            'تاريخ الإضافة','تاريخ الاسترداد','أضاف بواسطة','الحالة','الرقم المرجعي','ملاحظات'];
-  var cw = [5,22,16,14,16,22,14,11,11,16,14,12,22,18,18,16,14,14,18];
+            'تاريخ الإضافة','تاريخ الاسترداد','أضاف بواسطة','الحالة','الرقم المرجعي','ملاحظات','سبب الرفض'];
+  var cw = [5,22,16,14,16,22,14,11,11,16,14,12,22,18,18,16,14,14,18,18];
 
   try {
     var wb = new ExcelJS.Workbook();
@@ -140,7 +140,11 @@ function doExport(data, title, subtitle, filename) {
           right: { style:'thin', color:{ argb:'FFE2E8F0' } }
         };
         // تلوين الصفوف
-        if (isPrev) {
+        var isRej = rowData['الحالة'] === 'مرفوض';
+        if (isRej) {
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFF5F5' } };
+          cell.font = { name:'Tajawal', size:11, color:{ argb:'FF991B1B' } };
+        } else if (isPrev) {
           cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFF1F2' } };
           cell.font = { name:'Tajawal', size:11, color:{ argb:'FF9F1239' } };
         } else if (idx % 2 === 1) {

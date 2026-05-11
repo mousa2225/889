@@ -42,6 +42,8 @@ function getSt(c) {
   if (c.status) return c.status;
   return c.refunded ? 'refunded' : 'uploaded';
 }
+// Helper: هل السجل مرفوض
+function isRejected(c) { return getSt(c) === 'rejected'; }
 function gP() {
   if (!cu) return { canAdd: true, canDelete: true, canEdit: true };
   if (cu.role === 'admin') return { canAdd: true, canDelete: true, canEdit: true };

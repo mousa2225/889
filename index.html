@@ -282,6 +282,7 @@
         <button type="button" class="ft"    onclick="sFt('pending',this)">قيد المراجعة</button>
         <button type="button" class="ft"    onclick="sFt('refunded',this)">تم الاسترداد</button>
         <button type="button" class="ft"    onclick="sFt('prev',this)">سبق الاسترداد</button>
+        <button type="button" class="ft"    onclick="sFt('rejected',this)">مرفوض</button>
       </div>
     </div>
 
@@ -508,6 +509,34 @@ window.addEventListener('DOMContentLoaded', function() {
 </script>
 
 
+<!-- ===================== REJECT REASON MODAL ===================== -->
+<div class="mo fixed inset-0 z-50 flex items-center justify-center p-4" id="rjM">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="clRJ()"></div>
+  <div class="mc relative crd w-full max-w-sm">
+    <div class="px-5 py-3 flex items-center justify-between" style="border-bottom:1px solid var(--brd)">
+      <h3 style="font-size:14px;font-weight:800;color:#dc3545"><i class="fa-solid fa-circle-xmark ml-2"></i>سبب الرفض</h3>
+      <button type="button" onclick="clRJ()" class="w-7 h-7 rounded-md flex items-center justify-center" style="background:var(--ib);color:var(--dm)"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>
+    <div class="p-5">
+      <div id="rjView" style="display:none">
+        <div style="font-size:10px;font-weight:700;color:var(--mt);margin-bottom:8px">سبب الرفض من الإدارة:</div>
+        <div id="rjViewTxt" style="font-size:14px;font-weight:700;color:#dc3545;padding:12px;border-radius:10px;background:rgba(220,53,69,.06);border:1px solid rgba(220,53,69,.15)"></div>
+        <button type="button" onclick="clRJ()" class="bp" style="width:100%;margin-top:16px;justify-content:center">حسناً</button>
+      </div>
+      <div id="rjEdit" style="display:none">
+        <label style="font-size:11px;font-weight:700;color:var(--dm);display:block;margin-bottom:6px">أدخل سبب الرفض</label>
+        <textarea id="rjReason" class="fi" placeholder="سبب الرفض..." style="min-height:80px"></textarea>
+        <div class="flex gap-2.5 mt-3">
+          <button type="button" onclick="confirmReject()" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:800;border:none;cursor:pointer;background:linear-gradient(135deg,#dc3545,#b91c1c);color:#fff;font-family:Tajawal,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
+            <i class="fa-solid fa-circle-xmark"></i> تأكيد الرفض
+          </button>
+          <button type="button" onclick="clRJ()" class="bs">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== QUICK VIEW MODAL ===================== -->
 <div class="mo fixed inset-0 z-50 flex items-center justify-center p-3" id="qvM">
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="clQV()"></div>
@@ -710,6 +739,11 @@ window.addEventListener('DOMContentLoaded', function() {
           </div>
           <div class="ss">نوع الاسترداد</div>
         </div>
+        <div class="st" style="border-top:3px solid #dc3545">
+          <div class="sl">مرفوض</div>
+          <div class="sn" style="color:#dc3545" id="rpK12">0</div>
+          <div class="ss">طلبات مرفوضة</div>
+        </div>
       </div>
 
       <!-- KPI Cards Row 2 — بالمبلغ لكل حالة -->
@@ -737,6 +771,15 @@ window.addEventListener('DOMContentLoaded', function() {
             <div style="text-align:left">
               <div style="font-size:9px;color:var(--mt);margin-bottom:3px">إجمالي المبلغ</div>
               <div style="font-size:15px;font-weight:900;color:#e97a2a" id="rpK6">0.00 ريال</div>
+            </div>
+          </div>
+        </div>
+        <div class="st" style="border-right:4px solid #f59e0b">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="sl">فروقات التعديل المالي</div>
+              <div class="sn" style="font-size:13px;color:#f59e0b" id="rpK13">0</div>
+              <div class="ss">سجلات عُدّل مبلغها</div>
             </div>
           </div>
         </div>
@@ -781,6 +824,30 @@ window.addEventListener('DOMContentLoaded', function() {
       <div class="crd p-3 mb-3">
         <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-list-ul ml-1" style="color:#a78bfa"></i>أكثر أسباب الإلغاء والاسترداد</div>
         <div style="height:200px"><canvas id="rpCReasons"></canvas></div>
+      </div>
+
+      <!-- Chart: Discrepancy -->
+      <div class="crd p-3 mb-3">
+        <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-scale-unbalanced-flip ml-1" style="color:#f59e0b"></i>تقرير فروقات التعديلات المالية — قبل وبعد تعديل المبلغ</div>
+        <div style="height:200px"><canvas id="rpCDiff"></canvas></div>
+      </div>
+
+      <!-- Table: Discrepancies -->
+      <div class="crd p-3 mb-3">
+        <div class="text-xs font-bold mb-2" style="color:var(--dm)"><i class="fa-solid fa-table ml-1" style="color:#f59e0b"></i>تفاصيل الفروقات — المبلغ الأصلي مقابل المعدَّل</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-family:Tajawal,sans-serif">
+            <thead><tr style="background:rgba(245,158,11,.08)">
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#b45309;border-bottom:1px solid var(--brd)">اسم العميل</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#b45309;border-bottom:1px solid var(--brd)">الرقم</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#b45309;border-bottom:1px solid var(--brd)">المبلغ الأصلي</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#b45309;border-bottom:1px solid var(--brd)">بعد التعديل</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#b45309;border-bottom:1px solid var(--brd)">الفرق</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:#b45309;border-bottom:1px solid var(--brd)">أضاف بواسطة</th>
+            </tr></thead>
+            <tbody id="rpDiffBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Table: Prev Refunded -->

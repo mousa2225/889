@@ -174,6 +174,7 @@ function rnT() {
     if (cfl === 'pending'  && getSt(c) !== 'pending')  return false;
     if (cfl === 'refunded' && getSt(c) !== 'refunded') return false;
     if (cfl === 'prev' && !isDynPrevRef(c)) return false;
+    if (cfl === 'rejected' && getSt(c) !== 'rejected') return false;
     return true;
   });
   var dupPhones = {};
@@ -247,9 +248,17 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
   else if (st==='uploaded'&&pm.canDelete) ac='<button type="button" class="bd" onclick="dlC(\''+c.id+'\')"><i class="fa-solid fa-trash-can"></i></button>';
   else ac='<span style="color:var(--mt);font-size:10px"><i class="fa-solid fa-lock"></i></span>';
 
-  var stHtml = (a&&st==='pending')
-    ? '<td><button type="button" class="sb sb-click sb-p" onclick="apR(\''+c.id+'\')" title="اضغط للموافقة"><i class="'+STI[st]+' ml-0.5" style="font-size:9px"></i> '+STL[st]+'</button></td>'
-    : '<td><span class="sb '+STC[st]+'"><i class="'+STI[st]+' ml-0.5" style="font-size:9px"></i> '+STL[st]+'</span></td>';
+  var stHtml;
+  if (a && st === 'pending') {
+    stHtml = '<td><div style="display:flex;gap:3px;align-items:center">'
+      +'<button type="button" data-id="'+c.id+'" data-act="approve" class="sb sb-click sb-d" title="موافقة"><i class="'+STI['refunded']+' ml-0.5" style="font-size:9px"></i> '+STL['refunded']+'</button>'
+      +'<button type="button" data-id="'+c.id+'" data-act="reject" style="padding:3px 7px;border-radius:14px;font-size:9.5px;font-weight:700;border:1px solid rgba(220,53,69,.3);background:rgba(220,53,69,.06);color:#dc3545;cursor:pointer;white-space:nowrap" title="رفض"><i class="fa-solid fa-circle-xmark" style="font-size:9px"></i> رفض</button>'
+      +'</div></td>';
+  } else if (st === 'rejected') {
+    stHtml = '<td><button type="button" data-id="'+c.id+'" data-act="viewreject" class="sb sb-r" style="cursor:pointer" title="اعرف السبب"><i class="'+STI[st]+' ml-0.5" style="font-size:9px"></i> '+STL[st]+' <i class="fa-solid fa-eye" style="font-size:8px;opacity:.7"></i></button></td>';
+  } else {
+    stHtml = '<td><span class="sb '+STC[st]+'"><i class="'+STI[st]+' ml-0.5" style="font-size:9px"></i> '+STL[st]+'</span></td>';
+  }
 
   var phCell = isDup
     ? '<td><span class="num" dir="ltr" style="font-size:12px;color:#dc3545;font-weight:800">'+ph+' <span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:7px;font-size:8px;font-weight:800;background:rgba(220,53,69,.15);color:#dc3545;border:1px solid rgba(220,53,69,.3)"><i class="fa-solid fa-copy" style="font-size:7px"></i> مكرر</span></span></td>'
@@ -259,7 +268,7 @@ function renderNormalRow(c, i, a, pm, ht, dupPhones) {
     ? '<td><span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;background:rgba(233,122,42,.1);color:#e97a2a;border:1px solid rgba(233,122,42,.2)"><i class="fa-solid fa-money-bill-wave" style="font-size:7px"></i> مباشر</span></td>'
     : '<td><span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;background:rgba(0,212,170,.08);color:#00d4aa;border:1px solid rgba(0,212,170,.18)"><i class="fa-solid fa-rotate-left" style="font-size:7px"></i> اشتراك</span></td>';
 
-  return '<tr class="rn '+(prevRef?'pr':'')+'">'+
+  return '<tr class="rn '+(prevRef?'pr':'')+(st==='rejected'?' rj':'')+'">'+
     '<td class="font-bold text-[13px] num">'+(i+1)+'</td>'+
     '<td>'+esc(c.name)+(prevRef?' <span class="pb-t"><i class="fa-solid fa-triangle-exclamation"></i> سبق</span>':'')+'</td>'+
     phCell+rtCell+
@@ -364,12 +373,21 @@ function upF(id, f, v) {
   if (f==='packagePrice'||f==='packageDays'||f==='consumedDays') {
     u[f] = parseFloat(v)||0;
     var c = cls.find(function(x){ return x.id===id; });
-    if (c) u.refundAmount = cRf(
-      f==='packagePrice'?parseFloat(v)||0:c.packagePrice||0,
-      f==='packageDays'?parseFloat(v)||0:c.packageDays||0,
-      f==='consumedDays'?parseFloat(v)||0:c.consumedDays||0
-    );
-    if (isAdmin) u.adminEdited = true;
+    if (c) {
+      var newRa = cRf(
+        f==='packagePrice'?parseFloat(v)||0:c.packagePrice||0,
+        f==='packageDays'?parseFloat(v)||0:c.packageDays||0,
+        f==='consumedDays'?parseFloat(v)||0:c.consumedDays||0
+      );
+      u.refundAmount = newRa;
+      if (isAdmin) {
+        u.adminEdited = true;
+        // حفظ المبلغ الأصلي أول مرة فقط
+        if (!c.originalRefundAmount && c.originalRefundAmount !== 0) {
+          u.originalRefundAmount = c.refundAmount || 0;
+        }
+      }
+    }
   } else { u[f]=v; }
   db.collection('cancellations').doc(id).update(u).catch(function(){ toast('خطأ في التحديث','e'); });
 }
@@ -494,10 +512,13 @@ document.addEventListener('click', function(e) {
   var id  = btn.getAttribute('data-id');
   var act = btn.getAttribute('data-act');
   if (!id || !act) return;
-  if      (act === 'del')     dlC(id);
-  else if (act === 'edit')    startEdit(id);
-  else if (act === 'revert')  revertRefund(id);
-  else if (act === 'clearae') clearAdminEdited(id);
+  if      (act === 'del')        dlC(id);
+  else if (act === 'edit')       startEdit(id);
+  else if (act === 'revert')     revertRefund(id);
+  else if (act === 'clearae')    clearAdminEdited(id);
+  else if (act === 'approve')    apR(id);
+  else if (act === 'reject')     openReject(id);
+  else if (act === 'viewreject') viewRejectReason(id);
 });
 
 // ============================
@@ -687,4 +708,45 @@ function clearAdminEdited(id) {
   db.collection('cancellations').doc(id).update({ adminEdited: false })
     .then(function(){ toast('تم إزالة علامة التعديل','s'); rnT(); })
     .catch(function(){ toast('خطأ','e'); });
+}
+
+// ============================
+// رفض الطلب
+// ============================
+var rjTargetId = null;
+
+function openReject(id) {
+  rjTargetId = id;
+  document.getElementById('rjView').style.display = 'none';
+  document.getElementById('rjEdit').style.display = 'block';
+  document.getElementById('rjReason').value = '';
+  document.getElementById('rjM').classList.add('on');
+  setTimeout(function(){ document.getElementById('rjReason').focus(); }, 100);
+}
+
+function viewRejectReason(id) {
+  var c = cls.find(function(x){ return x.id===id; });
+  if (!c) return;
+  document.getElementById('rjViewTxt').textContent = c.rejectReason || 'لم يُذكر سبب';
+  document.getElementById('rjView').style.display = 'block';
+  document.getElementById('rjEdit').style.display = 'none';
+  document.getElementById('rjM').classList.add('on');
+}
+
+function clRJ() {
+  document.getElementById('rjM').classList.remove('on');
+  rjTargetId = null;
+}
+
+function confirmReject() {
+  if (!rjTargetId) return;
+  var reason = document.getElementById('rjReason').value.trim();
+  if (!reason) { toast('أدخل سبب الرفض','e'); return; }
+  var id = rjTargetId;
+  db.collection('cancellations').doc(id).update({
+    status: 'rejected', refunded: false, rejectReason: reason
+  }).then(function(){
+    toast('تم رفض الطلب','s');
+    clRJ(); ldPd(); chkP();
+  }).catch(function(e){ toast('خطأ','e'); console.error(e); });
 }

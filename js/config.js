@@ -21,6 +21,6 @@ var hideTm = false, srvOff = 0, autoInt = null, clkInt = null;
 // Constants
 // ============================
 var MA = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-var STL = { uploaded: 'تم الرفع', pending: 'قيد المراجعة', refunded: 'تم الاسترداد' };
-var STC = { uploaded: 'sb-u', pending: 'sb-p', refunded: 'sb-d' };
-var STI = { uploaded: 'fa-solid fa-cloud-arrow-up', pending: 'fa-solid fa-clock', refunded: 'fa-solid fa-circle-check' };
+var STL = { uploaded: 'تم الرفع', pending: 'قيد المراجعة', refunded: 'تم الاسترداد', rejected: 'مرفوض' };
+var STC = { uploaded: 'sb-u', pending: 'sb-p', refunded: 'sb-d', rejected: 'sb-r' };
+var STI = { uploaded: 'fa-solid fa-cloud-arrow-up', pending: 'fa-solid fa-clock', refunded: 'fa-solid fa-circle-check', rejected: 'fa-solid fa-circle-xmark' };
