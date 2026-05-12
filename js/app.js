@@ -19,7 +19,9 @@ function shApp() {
   document.getElementById('addBtn').style.display = gP().canAdd ? 'inline-flex' : 'none';
   var rpBtn = document.getElementById('rpBtn'); if (rpBtn) rpBtn.style.display = a ? 'inline-flex' : 'none';
   var srBtn = document.getElementById('startRfBtn'); if (srBtn) srBtn.style.display = a ? 'flex' : 'none';
-  var impBtn = document.getElementById('impBtn'); if (impBtn) impBtn.style.display = a ? 'flex' : 'none';
+  // إظهار خيار رفع البيانات في قائمة التصدير للمدير فقط
+  var exImpBtn = document.getElementById('exImportBtn'); if (exImpBtn) exImpBtn.style.display = a ? 'flex' : 'none';
+  var exImpSep = document.getElementById('exImportSep'); if (exImpSep) exImpSep.style.display = a ? 'block' : 'none';
   setTimeout(initExMenu, 100);
 
   db.collection('settings').doc('appSettings').onSnapshot(function(d) {
