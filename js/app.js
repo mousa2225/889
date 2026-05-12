@@ -504,6 +504,39 @@ function addC() {
 }
 
 // ============================
+// التراجع عن الاسترداد أو الرفض → قيد المراجعة
+// ============================
+function revertRefund(id) {
+  if (!cu || cu.role !== 'admin') { toast('للمدير فقط','e'); return; }
+  var c = cls.find(function(x){ return x.id===id; });
+  var isRej = c && getSt(c) === 'rejected';
+  var msg = isRej
+    ? 'هل تريد التراجع عن الرفض وإرجاع الطلب إلى "قيد المراجعة"؟'
+    : 'هل تريد التراجع عن هذا الاسترداد وإرجاعه إلى "قيد المراجعة"؟';
+  sCf(msg, function() {
+    var u = { status:'pending', refunded:false };
+    if (!isRej) u.refundDate = firebase.firestore.FieldValue.delete();
+    db.collection('cancellations').doc(id).update(u)
+      .then(function(){ toast('تم التراجع — العميل الآن قيد المراجعة','s'); ldPd(); chkP(); })
+      .catch(function(e){ toast('خطأ','e'); console.error(e); });
+  });
+}
+
+// ============================
+// إزالة علامة "تم التعديل من المالية"
+// ============================
+function clearAdminEdited(id) {
+  if (!cu || cu.role !== 'admin') return;
+  var c = cls.find(function(x){ return x.id===id; });
+  if (!c) return;
+  c.adminEdited = false;
+  rnT();
+  db.collection('cancellations').doc(id).update({ adminEdited: false })
+    .then(function(){ toast('تم إزالة علامة التعديل','s'); })
+    .catch(function(){ toast('خطأ','e'); });
+}
+
+// ============================
 // Table Click Delegation — يتعامل مع كل أزرار الجدول
 // ============================
 document.addEventListener('click', function(e) {
@@ -535,11 +568,12 @@ document.addEventListener('keydown', function(e) {
 // ============================
 // ابدأ الاسترداد — تنقل بين قيد المراجعة
 // ============================
-var qvList   = [];
-var qvIdx    = 0;
-var qvId     = null;
-var qvDirty  = false;
-var qvEditMode = false; // وضع تعديل النصوص
+var qvList         = [];
+var qvIdx          = 0;
+var qvId           = null;
+var qvDirty        = false;
+var qvEditMode     = false;
+var qvLastApprovedId = null; // وضع تعديل النصوص
 
 function openQV(startId) {
   qvList = cls.filter(function(c){ return getSt(c) === 'pending'; })
@@ -674,33 +708,39 @@ function qvSave(silent) {
   var isDirect=c.refundType==='direct';
   var u = {};
 
-  // تعديلات النصوص (وضع التعديل)
-  var ni=document.getElementById('qvNameI'), pi=document.getElementById('qvPhoneI');
-  var si=document.getElementById('qvSubI'),  ci=document.getElementById('qvCdtI');
-  var di=document.getElementById('qvDrI'),   ki=document.getElementById('qvPkI');
-  var ri=document.getElementById('qvRsI');
-  if (ni&&ni.style.display!=='none') {
-    if(ni.value.trim()) u.name=ni.value.trim();
-    if(pi.value.trim()) { u.phone=pi.value.trim(); u.mobile=pi.value.trim(); }
-    if(si.value.trim()) u.subscriptionDate=normDateStr(si.value.trim());
-    if(ci.value.trim()) u.cancelDate=normDateStr(ci.value.trim());
-    if(di.value.trim()) u.cancellationPeriod=di.value.trim();
-    if(ki.value.trim()) u.packageType=ki.value.trim();
-    if(ri.value.trim()) u.cancelReason=ri.value.trim();
-  }
+  // تعديلات النصوص — دائماً نقرأ من الحقول بغض النظر عن وضع العرض
+  var gvi = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  var nv=gvi('qvNameI'), pv=gvi('qvPhoneI'), sv=gvi('qvSubI'), cv=gvi('qvCdtI');
+  var dv=gvi('qvDrI'),   kv=gvi('qvPkI'),    rv=gvi('qvRsI');
+  if(nv && nv !== (c.name||''))                       u.name = nv;
+  if(pv && pv !== (c.phone||c.mobile||''))            { u.phone = pv; u.mobile = pv; }
+  if(sv && normDateStr(sv) !== (c.subscriptionDate||'')) u.subscriptionDate = normDateStr(sv);
+  if(cv && normDateStr(cv) !== (c.cancelDate||''))    u.cancelDate = normDateStr(cv);
+  if(dv && dv !== (c.cancellationPeriod||''))         u.cancellationPeriod = dv;
+  if(kv && kv !== (c.packageType||''))                u.packageType = kv;
+  if(rv && rv !== (c.cancelReason||''))               u.cancelReason = rv;
 
-  // تعديلات الأرقام
+  // تعديلات الأرقام — adminEdited فقط إذا تغيّر المبلغ المسترد فعلاً
   if (isDirect) {
-    u.refundAmount=parseFloat(document.getElementById('qvRA').value)||0;
-    u.adminEdited=true;
+    var newRaD = parseFloat(document.getElementById('qvRA').value)||0;
+    u.refundAmount = newRaD;
+    if (Math.abs(newRaD - (c.refundAmount||0)) > 0.001) {
+      u.adminEdited = true;
+      if (!c.originalRefundAmount && c.originalRefundAmount !== 0)
+        u.originalRefundAmount = c.refundAmount||0;
+    }
   } else {
     var pr=parseFloat(document.getElementById('qvPr').value)||0;
     var dy=parseFloat(document.getElementById('qvDy').value)||0;
     var co=parseFloat(document.getElementById('qvCo').value)||0;
+    var newRa = cRf(pr,dy,co);
     u.packagePrice=pr; u.packageDays=dy; u.consumedDays=co;
-    u.refundAmount=cRf(pr,dy,co); u.adminEdited=true;
-    if (!c.originalRefundAmount && c.originalRefundAmount!==0)
-      u.originalRefundAmount=c.refundAmount||0;
+    u.refundAmount = newRa;
+    if (Math.abs(newRa - (c.refundAmount||0)) > 0.001) {
+      u.adminEdited = true;
+      if (!c.originalRefundAmount && c.originalRefundAmount !== 0)
+        u.originalRefundAmount = c.refundAmount||0;
+    }
   }
 
   Object.assign(c, u);
@@ -731,23 +771,23 @@ function qvApprove() {
     // أظهر حقل الرقم المرجعي
     document.getElementById('qvRefNumBox').style.display='block';
     document.getElementById('qvRefNumI').value='';
-    // أزل من القائمة
+    // حفظ id للرقم المرجعي + أزل من القائمة
+    qvLastApprovedId = id;
     qvList=qvList.filter(function(c){return c.id!==id;});
   }).catch(function(){toast('خطأ','e');});
 }
 
 // حفظ الرقم المرجعي بعد الاسترداد
 function qvSaveRefNum() {
-  if (!qvId) {
-    // البحث عن آخر مستردة
-    var refNum=document.getElementById('qvRefNumI').value.trim();
-    if (!refNum) { qvNextAfterAction(); return; }
-    // إيجاد السجل المسترد للتو
-    var last=cls.filter(function(c){return getSt(c)==='refunded';})
-      .sort(function(a,b){return (b.refundDate?b.refundDate.seconds:0)-(a.refundDate?a.refundDate.seconds:0)})[0];
-    if (last) db.collection('cancellations').doc(last.id).update({referenceNumber:refNum})
-      .then(function(){toast('تم حفظ الرقم المرجعي','s');});
+  var refNum = document.getElementById('qvRefNumI').value.trim();
+  if (refNum && qvLastApprovedId) {
+    db.collection('cancellations').doc(qvLastApprovedId).update({ referenceNumber: refNum })
+      .then(function(){ toast('تم حفظ الرقم المرجعي','s'); });
+    // تحديث محلي
+    var lc = cls.find(function(x){ return x.id===qvLastApprovedId; });
+    if (lc) lc.referenceNumber = refNum;
   }
+  qvLastApprovedId = null;
   qvNextAfterAction();
 }
 
