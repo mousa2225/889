@@ -535,67 +535,101 @@ document.addEventListener('keydown', function(e) {
 // ============================
 // ابدأ الاسترداد — تنقل بين قيد المراجعة
 // ============================
-var qvList  = [];
-var qvIdx   = 0;
-var qvId    = null;
-var qvDirty = false; // true فقط إذا المستخدم غيّر قيمة فعلاً
+var qvList   = [];
+var qvIdx    = 0;
+var qvId     = null;
+var qvDirty  = false;
+var qvEditMode = false; // وضع تعديل النصوص
 
 function openQV(startId) {
   qvList = cls.filter(function(c){ return getSt(c) === 'pending'; })
-    .sort(function(a,b){
-      return (a.createdAt ? a.createdAt.seconds : 0) - (b.createdAt ? b.createdAt.seconds : 0);
-    });
+    .sort(function(a,b){ return (a.createdAt?a.createdAt.seconds:0)-(b.createdAt?b.createdAt.seconds:0); });
   if (!qvList.length) { toast('لا يوجد عملاء قيد المراجعة','w'); return; }
-  if (startId) {
-    var f = qvList.findIndex(function(c){ return c.id === startId; });
-    qvIdx = f >= 0 ? f : 0;
-  } else { qvIdx = 0; }
+  qvIdx = startId ? Math.max(0, qvList.findIndex(function(c){ return c.id===startId; })) : 0;
+  qvEditMode = false;
   document.getElementById('qvM').classList.add('on');
   qvRender();
 }
 
 function clQV() {
   document.getElementById('qvM').classList.remove('on');
-  qvId = null; qvList = []; qvIdx = 0; qvDirty = false;
+  qvId=null; qvList=[]; qvIdx=0; qvDirty=false; qvEditMode=false;
+  document.getElementById('qvRefNumBox').style.display='none';
+  qvSetEditUI(false);
 }
 
 function qvNav(dir) {
-  if (qvDirty) qvSave(true); // حفظ فقط لو في تغيير حقيقي
-  qvIdx = (qvIdx + dir + qvList.length) % qvList.length;
+  if (qvDirty) qvSave(true);
+  qvIdx = (qvIdx+dir+qvList.length) % qvList.length;
+  qvEditMode=false;
+  document.getElementById('qvRefNumBox').style.display='none';
   qvRender();
 }
 
-function qvMarkDirty() {
-  qvDirty = true; // يُستدعى من oninput في الحقول
+// toggle edit mode
+function qvToggleEdit() {
+  qvEditMode = !qvEditMode;
+  qvSetEditUI(qvEditMode);
+  if (qvEditMode) {
+    var c = qvList[qvIdx]; if (!c) return;
+    document.getElementById('qvNameI').value  = c.name||'';
+    document.getElementById('qvPhoneI').value = c.phone||c.mobile||'';
+    document.getElementById('qvSubI').value   = c.subscriptionDate||'';
+    document.getElementById('qvCdtI').value   = c.cancelDate||'';
+    document.getElementById('qvDrI').value    = c.cancellationPeriod||'';
+    document.getElementById('qvPkI').value    = c.packageType||'';
+    document.getElementById('qvRsI').value    = c.cancelReason||'';
+    setTimeout(function(){ document.getElementById('qvNameI').focus(); }, 50);
+  }
 }
 
+function qvSetEditUI(on) {
+  var pairs = [['qvName','qvNameI'],['qvPhone','qvPhoneI'],['qvSub','qvSubI'],
+               ['qvCdt','qvCdtI'],['qvDr','qvDrI'],['qvPk','qvPkI'],['qvRs','qvRsI']];
+  pairs.forEach(function(p){
+    var disp=document.getElementById(p[0]), inp=document.getElementById(p[1]);
+    if(disp) disp.style.display = on?'none':'block';
+    if(inp)  inp.style.display  = on?'block':'none';
+  });
+  var btn = document.getElementById('qvEditToggle');
+  if (btn) {
+    btn.style.background = on ? 'rgba(0,212,170,.12)' : 'rgba(96,165,250,.07)';
+    btn.style.color      = on ? '#00d4aa' : '#60a5fa';
+    btn.style.borderColor= on ? 'rgba(0,212,170,.3)' : 'rgba(96,165,250,.3)';
+    btn.innerHTML = on
+      ? '<i class="fa-solid fa-check text-[9px]"></i> تطبيق'
+      : '<i class="fa-solid fa-pen-to-square text-[9px]"></i> تعديل';
+    // لو كان في وضع تطبيق وضغط → حفظ التغييرات النصية
+    if (!on && qvDirty) qvSave(true);
+  }
+}
+
+function qvMarkDirty() { qvDirty = true; }
+
 function qvRender() {
-  var c = qvList[qvIdx];
-  if (!c) return;
-  qvId    = c.id;
-  qvDirty = false; // ← إعادة ضبط عند كل عرض جديد
+  var c = qvList[qvIdx]; if (!c) return;
+  qvId=c.id; qvDirty=false; qvEditMode=false;
+  qvSetEditUI(false);
 
-  var isDirect = c.refundType === 'direct';
-  var prevRef  = isDynPrevRef(c);
-  var rawPh    = (c.phone||c.mobile||'').trim();
-  var dupPhones = {};
-  cls.forEach(function(x){ var p=(x.phone||x.mobile||'').trim(); if(p) dupPhones[p]=(dupPhones[p]||0)+1; });
-  var isDup = rawPh && dupPhones[rawPh] > 1;
+  var isDirect=c.refundType==='direct', prevRef=isDynPrevRef(c);
+  var rawPh=(c.phone||c.mobile||'').trim();
+  var dupPhones={};
+  cls.forEach(function(x){var p=(x.phone||x.mobile||'').trim();if(p)dupPhones[p]=(dupPhones[p]||0)+1;});
+  var isDup=rawPh&&dupPhones[rawPh]>1;
 
-  document.getElementById('qvCounter').textContent = (qvIdx+1) + ' / ' + qvList.length;
-  document.getElementById('qvPrevBtn').style.opacity = qvList.length > 1 ? '1' : '0.3';
-  document.getElementById('qvNextBtn').style.opacity = qvList.length > 1 ? '1' : '0.3';
+  document.getElementById('qvCounter').textContent=(qvIdx+1)+' / '+qvList.length;
+  document.getElementById('qvPrevBtn').style.opacity=qvList.length>1?'1':'0.3';
+  document.getElementById('qvNextBtn').style.opacity=qvList.length>1?'1':'0.3';
 
-  var typeEl = document.getElementById('qvType');
-  typeEl.textContent = isDirect ? '💵 مباشر' : '🔄 اشتراك';
-  typeEl.style.cssText = isDirect
-    ? 'background:rgba(233,122,42,.1);color:#e97a2a;border:1px solid rgba(233,122,42,.2);padding:3px 10px;border-radius:8px;font-size:10px;font-weight:800'
-    : 'background:rgba(0,212,170,.1);color:#00d4aa;border:1px solid rgba(0,212,170,.2);padding:3px 10px;border-radius:8px;font-size:10px;font-weight:800';
+  var typeEl=document.getElementById('qvType');
+  typeEl.textContent=isDirect?'💵 مباشر':'🔄 اشتراك';
+  typeEl.style.cssText=isDirect
+    ?'background:rgba(233,122,42,.1);color:#e97a2a;border:1px solid rgba(233,122,42,.2);padding:3px 10px;border-radius:8px;font-size:10px;font-weight:800'
+    :'background:rgba(0,212,170,.1);color:#00d4aa;border:1px solid rgba(0,212,170,.2);padding:3px 10px;border-radius:8px;font-size:10px;font-weight:800';
 
-  document.getElementById('qvPrev').style.display = prevRef ? 'flex' : 'none';
-  document.getElementById('qvDup').style.display  = isDup   ? 'flex' : 'none';
-  // إشارة تعديل المالية — تظهر فقط إذا السجل فيه adminEdited مسبقاً
-  document.getElementById('qvAEBadge').style.display = c.adminEdited ? 'flex' : 'none';
+  document.getElementById('qvPrev').style.display=prevRef?'flex':'none';
+  document.getElementById('qvDup').style.display=isDup?'flex':'none';
+  document.getElementById('qvAEBadge').style.display=c.adminEdited?'flex':'none';
 
   document.getElementById('qvName').textContent  = c.name||'—';
   document.getElementById('qvPhone').textContent = en(rawPh||'—');
@@ -607,113 +641,123 @@ function qvRender() {
   document.getElementById('qvCrd').textContent   = fmtDtT(c.createdAt);
   document.getElementById('qvBy').textContent    = c.addedByUsername||'—';
 
-  var subFields = document.getElementById('qvSubFields');
-  var refBox    = document.getElementById('qvRefBox');
+  var subFields=document.getElementById('qvSubFields'), refBox=document.getElementById('qvRefBox');
   if (isDirect) {
-    subFields.style.display = 'none';
-    document.getElementById('qvRA').readOnly = false;
-    document.getElementById('qvRA').style.color = '#e97a2a';
-    refBox.style.borderColor = 'rgba(233,122,42,.3)';
+    subFields.style.display='none';
+    document.getElementById('qvRA').readOnly=false;
+    document.getElementById('qvRA').style.color='#e97a2a';
+    refBox.style.borderColor='rgba(233,122,42,.3)';
   } else {
-    subFields.style.display = 'block';
-    // ← تعيين القيم بدقة بدون en() لتجنب مشاكل المقارنة
-    document.getElementById('qvPr').value = (c.packagePrice||0).toString();
-    document.getElementById('qvDy').value = (c.packageDays||0).toString();
-    document.getElementById('qvCo').value = (c.consumedDays||0).toString();
-    document.getElementById('qvRA').readOnly = true;
-    document.getElementById('qvRA').style.color = '#00d4aa';
-    refBox.style.borderColor = 'rgba(0,212,170,.2)';
+    subFields.style.display='block';
+    document.getElementById('qvPr').value=(c.packagePrice||0).toString();
+    document.getElementById('qvDy').value=(c.packageDays||0).toString();
+    document.getElementById('qvCo').value=(c.consumedDays||0).toString();
+    document.getElementById('qvRA').readOnly=true;
+    document.getElementById('qvRA').style.color='#00d4aa';
+    refBox.style.borderColor='rgba(0,212,170,.2)';
   }
-  document.getElementById('qvRA').value = (c.refundAmount||0).toFixed(2);
+  document.getElementById('qvRA').value=(c.refundAmount||0).toFixed(2);
 }
 
 function qvCalc() {
   var pr=parseFloat(document.getElementById('qvPr').value)||0;
   var dy=parseFloat(document.getElementById('qvDy').value)||0;
   var co=parseFloat(document.getElementById('qvCo').value)||0;
-  document.getElementById('qvRA').value = cRf(pr,dy,co).toFixed(2);
-  qvDirty = true; // المستخدم غيّر قيمة
+  document.getElementById('qvRA').value=cRf(pr,dy,co).toFixed(2);
+  qvDirty=true;
 }
 
-// حفظ — لا يُنفَّذ إلا إذا qvDirty = true
 function qvSave(silent) {
-  if (!qvId || !qvDirty) {
-    if (!silent) toast('لا توجد تعديلات','i');
-    return;
-  }
-  var c = cls.find(function(x){ return x.id===qvId; });
+  if (!qvId || !qvDirty) { if(!silent) toast('لا توجد تعديلات','i'); return; }
+  var c=cls.find(function(x){return x.id===qvId;});
   if (!c) return;
-  var isDirect = c.refundType === 'direct';
-  var u;
+  var isDirect=c.refundType==='direct';
+  var u = {};
+
+  // تعديلات النصوص (وضع التعديل)
+  var ni=document.getElementById('qvNameI'), pi=document.getElementById('qvPhoneI');
+  var si=document.getElementById('qvSubI'),  ci=document.getElementById('qvCdtI');
+  var di=document.getElementById('qvDrI'),   ki=document.getElementById('qvPkI');
+  var ri=document.getElementById('qvRsI');
+  if (ni&&ni.style.display!=='none') {
+    if(ni.value.trim()) u.name=ni.value.trim();
+    if(pi.value.trim()) { u.phone=pi.value.trim(); u.mobile=pi.value.trim(); }
+    if(si.value.trim()) u.subscriptionDate=normDateStr(si.value.trim());
+    if(ci.value.trim()) u.cancelDate=normDateStr(ci.value.trim());
+    if(di.value.trim()) u.cancellationPeriod=di.value.trim();
+    if(ki.value.trim()) u.packageType=ki.value.trim();
+    if(ri.value.trim()) u.cancelReason=ri.value.trim();
+  }
+
+  // تعديلات الأرقام
   if (isDirect) {
-    u = { refundAmount: parseFloat(document.getElementById('qvRA').value)||0, adminEdited: true };
+    u.refundAmount=parseFloat(document.getElementById('qvRA').value)||0;
+    u.adminEdited=true;
   } else {
     var pr=parseFloat(document.getElementById('qvPr').value)||0;
     var dy=parseFloat(document.getElementById('qvDy').value)||0;
     var co=parseFloat(document.getElementById('qvCo').value)||0;
-    u = { packagePrice:pr, packageDays:dy, consumedDays:co, refundAmount:cRf(pr,dy,co), adminEdited:true };
+    u.packagePrice=pr; u.packageDays=dy; u.consumedDays=co;
+    u.refundAmount=cRf(pr,dy,co); u.adminEdited=true;
+    if (!c.originalRefundAmount && c.originalRefundAmount!==0)
+      u.originalRefundAmount=c.refundAmount||0;
   }
+
   Object.assign(c, u);
-  qvDirty = false;
+  // تحديث العرض بعد الحفظ
+  document.getElementById('qvName').textContent  = c.name||'—';
+  document.getElementById('qvPhone').textContent = en((c.phone||c.mobile||''));
+  document.getElementById('qvSub').textContent   = c.subscriptionDate||'—';
+  document.getElementById('qvCdt').textContent   = c.cancelDate||'—';
+  document.getElementById('qvDr').textContent    = c.cancellationPeriod||'—';
+  document.getElementById('qvPk').textContent    = c.packageType||'—';
+  document.getElementById('qvRs').textContent    = c.cancelReason||'—';
+  qvSetEditUI(false); qvEditMode=false; qvDirty=false;
+
   db.collection('cancellations').doc(qvId).update(u)
-    .catch(function(e){ toast('خطأ في المزامنة','e'); console.error(e); });
+    .catch(function(e){toast('خطأ في المزامنة','e');console.error(e);});
   if (!silent) toast('تم الحفظ','s');
-  // تحديث شارة adminEdited في الموديل
-  document.getElementById('qvAEBadge').style.display = 'flex';
 }
 
-// موافقة من الموديل
 function qvApprove() {
   if (!qvId) return;
   if (qvDirty) qvSave(true);
-  var id = qvId;
+  var id=qvId;
   db.collection('cancellations').doc(id).update({
     status:'refunded', refunded:true,
-    refundDate: firebase.firestore.FieldValue.serverTimestamp()
+    refundDate:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    toast('تم الاسترداد ✓','s');
-    ldPd(); chkP();
-    qvList = qvList.filter(function(c){ return c.id !== id; });
-    if (!qvList.length) { clQV(); toast('تم الانتهاء من جميع الطلبات 🎉','s'); return; }
-    if (qvIdx >= qvList.length) qvIdx = 0;
-    qvId = null; qvDirty = false;
-    qvRender();
-  }).catch(function(){ toast('خطأ','e'); });
+    toast('تم الاسترداد ✓','s'); ldPd(); chkP();
+    // أظهر حقل الرقم المرجعي
+    document.getElementById('qvRefNumBox').style.display='block';
+    document.getElementById('qvRefNumI').value='';
+    // أزل من القائمة
+    qvList=qvList.filter(function(c){return c.id!==id;});
+  }).catch(function(){toast('خطأ','e');});
 }
 
-// ============================
-// التراجع عن حالة "تم الاسترداد" → قيد المراجعة
-// ============================
-function revertRefund(id) {
-  if (!cu || cu.role !== 'admin') { toast('للمدير فقط','e'); return; }
-  var c = cls.find(function(x){ return x.id===id; });
-  var isRej = c && getSt(c) === 'rejected';
-  var msg = isRej
-    ? 'هل تريد التراجع عن الرفض وإرجاع الطلب إلى "قيد المراجعة"؟'
-    : 'هل تريد التراجع عن هذا الاسترداد وإرجاعه إلى "قيد المراجعة"؟';
-  sCf(msg, function() {
-    var u = { status: 'pending', refunded: false };
-    if (!isRej) u.refundDate = firebase.firestore.FieldValue.delete();
-    db.collection('cancellations').doc(id).update(u)
-      .then(function(){
-        toast('تم التراجع — العميل الآن قيد المراجعة','s');
-        ldPd(); chkP();
-      }).catch(function(e){ toast('خطأ','e'); console.error(e); });
-  });
+// حفظ الرقم المرجعي بعد الاسترداد
+function qvSaveRefNum() {
+  if (!qvId) {
+    // البحث عن آخر مستردة
+    var refNum=document.getElementById('qvRefNumI').value.trim();
+    if (!refNum) { qvNextAfterAction(); return; }
+    // إيجاد السجل المسترد للتو
+    var last=cls.filter(function(c){return getSt(c)==='refunded';})
+      .sort(function(a,b){return (b.refundDate?b.refundDate.seconds:0)-(a.refundDate?a.refundDate.seconds:0)})[0];
+    if (last) db.collection('cancellations').doc(last.id).update({referenceNumber:refNum})
+      .then(function(){toast('تم حفظ الرقم المرجعي','s');});
+  }
+  qvNextAfterAction();
 }
 
-// ============================
-// إزالة علامة "تم التعديل من المالية"
-// ============================
-function clearAdminEdited(id) {
-  if (!cu || cu.role !== 'admin') return;
-  var c = cls.find(function(x){ return x.id===id; });
-  if (!c) return;
-  c.adminEdited = false;
-  db.collection('cancellations').doc(id).update({ adminEdited: false })
-    .then(function(){ toast('تم إزالة علامة التعديل','s'); rnT(); })
-    .catch(function(){ toast('خطأ','e'); });
+function qvNextAfterAction() {
+  document.getElementById('qvRefNumBox').style.display='none';
+  if (!qvList.length) { clQV(); toast('تم الانتهاء من جميع الطلبات 🎉','s'); return; }
+  if (qvIdx>=qvList.length) qvIdx=0;
+  qvId=null; qvDirty=false; qvRender();
 }
+
 
 // ============================
 // رفض من شاشة التمرير السريع
@@ -721,10 +765,8 @@ function clearAdminEdited(id) {
 function qvReject() {
   if (!qvId) return;
   if (qvDirty) qvSave(true);
-  openReject(qvId);
-  // بعد الرفض: أزل من القائمة وانتقل للتالي
-  var origConfirm = window._qvRejectConfirm;
   window._qvRejectConfirm = qvId;
+  openReject(qvId);
 }
 
 // ============================
@@ -766,11 +808,11 @@ function confirmReject() {
     toast('تم رفض الطلب','s');
     clRJ(); ldPd(); chkP();
     // لو الرفض جاء من شاشة التمرير، انتقل للتالي
-    if (window._qvRejectConfirm === id && qvList.length) {
-      qvList = qvList.filter(function(c){ return c.id !== id; });
-      if (!qvList.length) { clQV(); toast('تم الانتهاء من جميع الطلبات 🎉','s'); }
-      else { if (qvIdx >= qvList.length) qvIdx = 0; qvId = null; qvDirty = false; qvRender(); }
+    if (window._qvRejectConfirm === id) {
       window._qvRejectConfirm = null;
+      qvList = qvList.filter(function(c){ return c.id !== id; });
+      qvId = null; qvDirty = false;
+      qvNextAfterAction();
     }
   }).catch(function(e){ toast('خطأ','e'); console.error(e); });
 }
