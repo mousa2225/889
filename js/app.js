@@ -642,7 +642,7 @@ function qvSetEditUI(on) {
       ? '<i class="fa-solid fa-check text-[9px]"></i> تطبيق'
       : '<i class="fa-solid fa-pen-to-square text-[9px]"></i> تعديل';
     // لو كان في وضع تطبيق وضغط → حفظ التغييرات النصية
-    if (!on && qvDirty) qvSave(true);
+    if (!on && qvDirty) qvSave(false);
   }
 }
 
@@ -682,6 +682,14 @@ function qvRender() {
   document.getElementById('qvRs').textContent    = c.cancelReason||'—';
   document.getElementById('qvCrd').textContent   = fmtDtT(c.createdAt);
   document.getElementById('qvBy').textContent    = c.addedByUsername||'—';
+  // عبّئ حقول الإدخال النصية دائماً لضمان قراءة صحيحة عند الحفظ
+  document.getElementById('qvNameI').value  = c.name||'';
+  document.getElementById('qvPhoneI').value = c.phone||c.mobile||'';
+  document.getElementById('qvSubI').value   = c.subscriptionDate||'';
+  document.getElementById('qvCdtI').value   = c.cancelDate||'';
+  document.getElementById('qvDrI').value    = c.cancellationPeriod||'';
+  document.getElementById('qvPkI').value    = c.packageType||'';
+  document.getElementById('qvRsI').value    = c.cancelReason||'';
 
   var subFields=document.getElementById('qvSubFields'), refBox=document.getElementById('qvRefBox');
   if (isDirect) {
@@ -763,8 +771,8 @@ function qvSave(silent) {
   document.getElementById('qvPk').textContent    = c.packageType||'—';
   document.getElementById('qvRs').textContent    = c.cancelReason||'—';
   qvSetEditUI(false); qvEditMode=false; qvDirty=false;
-  // تحديث الجدول بصرياً فوراً
-  rnT();
+  // تحديث الجدول بصرياً — فقط عند الحفظ الصريح من المستخدم
+  if (!silent) rnT();
 
   db.collection('cancellations').doc(qvId).update(u)
     .catch(function(e){toast('خطأ في المزامنة','e');console.error(e);});
