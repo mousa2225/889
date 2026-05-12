@@ -611,8 +611,8 @@ function qvNav(dir) {
 // toggle edit mode
 function qvToggleEdit() {
   qvEditMode = !qvEditMode;
-  qvSetEditUI(qvEditMode);
   if (qvEditMode) {
+    // وضع التعديل: عبّئ الحقول وأظهرها
     var c = qvList[qvIdx]; if (!c) return;
     document.getElementById('qvNameI').value  = c.name||'';
     document.getElementById('qvPhoneI').value = c.phone||c.mobile||'';
@@ -621,7 +621,12 @@ function qvToggleEdit() {
     document.getElementById('qvDrI').value    = c.cancellationPeriod||'';
     document.getElementById('qvPkI').value    = c.packageType||'';
     document.getElementById('qvRsI').value    = c.cancelReason||'';
+    qvSetEditUI(true);
     setTimeout(function(){ document.getElementById('qvNameI').focus(); }, 50);
+  } else {
+    // وضع التطبيق: أخفِ الحقول أولاً ثم احفظ
+    qvSetEditUI(false);
+    if (qvDirty) qvSave(false); // ← الاستدعاء الوحيد لـ qvSave من هنا
   }
 }
 
@@ -641,8 +646,7 @@ function qvSetEditUI(on) {
     btn.innerHTML = on
       ? '<i class="fa-solid fa-check text-[9px]"></i> تطبيق'
       : '<i class="fa-solid fa-pen-to-square text-[9px]"></i> تعديل';
-    // لو كان في وضع تطبيق وضغط → حفظ التغييرات النصية
-    if (!on && qvDirty) qvSave(false);
+    // لا نستدعي qvSave هنا — qvToggleEdit هي المسؤولة
   }
 }
 
@@ -761,6 +765,9 @@ function qvSave(silent) {
 
   if (!Object.keys(u).length) { qvDirty=false; return; } // لا شيء تغيّر
 
+  // اضبط الحالة أولاً قبل أي استدعاء آخر
+  qvDirty = false;
+  qvEditMode = false;
   Object.assign(c, u);
   // تحديث العرض الداخلي في الموديل
   document.getElementById('qvName').textContent  = c.name||'—';
@@ -770,9 +777,8 @@ function qvSave(silent) {
   document.getElementById('qvDr').textContent    = c.cancellationPeriod||'—';
   document.getElementById('qvPk').textContent    = c.packageType||'—';
   document.getElementById('qvRs').textContent    = c.cancelReason||'—';
-  qvSetEditUI(false); qvEditMode=false; qvDirty=false;
-  // تحديث الجدول بصرياً — فقط عند الحفظ الصريح من المستخدم
-  if (!silent) rnT();
+  // تحديث الجدول بصرياً دائماً
+  rnT();
 
   db.collection('cancellations').doc(qvId).update(u)
     .catch(function(e){toast('خطأ في المزامنة','e');console.error(e);});
