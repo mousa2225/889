@@ -58,6 +58,7 @@ function impShowPreview(data) {
     { key:'addedByUsername', label:'أضاف بواسطة',              req:false },
     { key:'notes',           label:'ملاحظات',                   req:false },
     { key:'rejectReason',    label:'سبب الرفض',                 req:false },
+    { key:'refundType',      label:'نوع الاسترداد (اشتراك/مباشر)', req:false },
   ];
 
   var html = '<div style="font-size:10px;font-weight:700;color:var(--mt);margin-bottom:8px">تعيين الأعمدة</div>'
@@ -116,6 +117,7 @@ function autoMapCol(colName, fieldKey) {
     cancellationPeriod: ['مده','مدة','period','cancellation period','مدة الالغاء'],
     addedByUsername:    ['اضاف','added by','مضاف','بواسطة','username'],
     rejectReason:       ['سبب الرفض','reject','rejectreason'],
+    refundType:         ['نوع الاسترداد','refundtype','نوع'],
   };
   var keys = maps[fieldKey] || [];
   return keys.some(function(k){ return c.includes(k.toLowerCase().replace(/\s/g,'')); });
@@ -192,8 +194,8 @@ function doImport() {
   var ts = firebase.firestore.Timestamp.fromDate(importDate);
 
   var importBatchId = 'imp_' + Date.now();
-  var batch = db.batch();
   var count = 0, errors = 0;
+  var allDocs = [];  // نجمع الـ docs أولاً ثم نرسلها على دفعات
 
   impRows.forEach(function(row) {
     var name   = getImpVal(row,'name').trim();
@@ -214,6 +216,7 @@ function doImport() {
     var byUser = getImpVal(row,'addedByUsername').trim();
     var notes  = getImpVal(row,'notes').trim();
     var rjrs   = getImpVal(row,'rejectReason').trim();
+    var rtype  = getImpVal(row,'refundType').trim();
 
     // هل تم استرداده سابقاً بنفس الرقم والاشتراك
     var normSub = normDateStr(sub) || sub;
@@ -223,11 +226,20 @@ function doImport() {
     });
 
     var refundDateVal = impParseDate(getImpVal(row,'refundDate'));
-    var refundTs = refundDateVal ? firebase.firestore.Timestamp.fromDate(new Date(refundDateVal)) : ts;
+    var refundTs = ts;
+    if (refundDateVal) {
+      // impParseDate يرجع نص عربي — نحوله لـ Date عبر parseSubDate
+      var rdParsed = parseSubDate(refundDateVal);
+      if (rdParsed && !isNaN(rdParsed.getTime())) {
+        refundTs = firebase.firestore.Timestamp.fromDate(rdParsed);
+      }
+    }
 
     var doc = {
       name: name, phone: phone, mobile: phone,
-      refundType: pr>0&&dy>0 ? 'subscription' : 'direct',
+      refundType: (rtype==='اشتراك'||rtype==='subscription') ? 'subscription'
+                : (rtype==='مباشر'||rtype==='direct') ? 'direct'
+                : (pr>0&&dy>0 ? 'subscription' : 'direct'),
       subscriptionDate: normSub,
       cancelDate: cdt,
       cancellationPeriod: dr,
@@ -245,7 +257,7 @@ function doImport() {
     if (status==='refunded') doc.refundDate = refundTs;
     if (status==='rejected') doc.rejectReason = rjrs || '';
 
-    batch.set(db.collection('cancellations').doc(), doc);
+    allDocs.push(doc);
     count++;
   });
 
@@ -253,17 +265,39 @@ function doImport() {
 
   var btn = document.getElementById('impDoBtn');
   btn.disabled = true;
-  btn.textContent = 'جاري الاستيراد...';
+  btn.textContent = 'جاري الاستيراد (0/' + count + ')...';
 
-  batch.commit().then(function(){
-    var msg = 'تم استيراد '+count+' سجل'; if(errors) msg += ' (تم تخطي '+errors+')'; toast(msg, 's');
-    lastImportBatchId = importBatchId;
-    clImport();
-    chkP();
-  }).catch(function(e){
-    toast('خطأ في الاستيراد','e');
-    console.error(e);
-    btn.disabled = false;
-    btn.textContent = 'استيراد';
-  });
+  // تقسيم على دفعات بحد 499 لكل دفعة
+  var chunks = [];
+  for (var i = 0; i < allDocs.length; i += 499) {
+    chunks.push(allDocs.slice(i, i + 499));
+  }
+
+  var chunkIdx = 0;
+  function commitNext() {
+    if (chunkIdx >= chunks.length) {
+      var msg = 'تم استيراد '+count+' سجل';
+      if (errors) msg += ' (تم تخطي '+errors+')';
+      toast(msg, 's');
+      lastImportBatchId = importBatchId;
+      clImport();
+      chkP();
+      return;
+    }
+    var b = db.batch();
+    chunks[chunkIdx].forEach(function(doc) {
+      b.set(db.collection('cancellations').doc(), doc);
+    });
+    btn.textContent = 'جاري الاستيراد (' + (chunkIdx*499) + '/' + count + ')...';
+    b.commit().then(function() {
+      chunkIdx++;
+      commitNext();
+    }).catch(function(e) {
+      toast('خطأ في الاستيراد','e');
+      console.error(e);
+      btn.disabled = false;
+      btn.textContent = 'استيراد';
+    });
+  }
+  commitNext();
 }
