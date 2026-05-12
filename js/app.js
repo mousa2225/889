@@ -346,13 +346,21 @@ function saveEdit(id) {
   if (!gv('eN'))  { toast('الاسم مطلوب','e'); return; }
   if (!gv('ePh')) { toast('الرقم مطلوب','e'); return; }
 
+  // adminEdited فقط إذا تغيّر المبلغ المسترد فعلاً
+  var oldRa = c ? (c.refundAmount||0) : 0;
+  var amtChanged = Math.abs(ra - oldRa) > 0.001;
   var u = {
     name: gv('eN'), phone: gv('ePh'), mobile: gv('ePh'),
     subscriptionDate: normDateStr(gv('eSub')), packageType: gv('ePk'),
     packagePrice: pr, packageDays: dy, consumedDays: co, refundAmount: ra,
     cancelDate: normDateStr(gv('eDt')), cancellationPeriod: gv('eDr'),
-    cancelReason: gv('eRs'), notes: gv('eNo'), adminEdited: true
+    cancelReason: gv('eRs'), notes: gv('eNo')
   };
+  if (amtChanged) {
+    u.adminEdited = true;
+    if (c && !c.originalRefundAmount && c.originalRefundAmount !== 0)
+      u.originalRefundAmount = oldRa;
+  }
 
   // ← تحديث محلي فوري (optimistic) — لا ننتظر Firestore
   Object.assign(c, u);
@@ -743,8 +751,10 @@ function qvSave(silent) {
     }
   }
 
+  if (!Object.keys(u).length) { qvDirty=false; return; } // لا شيء تغيّر
+
   Object.assign(c, u);
-  // تحديث العرض بعد الحفظ
+  // تحديث العرض الداخلي في الموديل
   document.getElementById('qvName').textContent  = c.name||'—';
   document.getElementById('qvPhone').textContent = en((c.phone||c.mobile||''));
   document.getElementById('qvSub').textContent   = c.subscriptionDate||'—';
@@ -753,6 +763,8 @@ function qvSave(silent) {
   document.getElementById('qvPk').textContent    = c.packageType||'—';
   document.getElementById('qvRs').textContent    = c.cancelReason||'—';
   qvSetEditUI(false); qvEditMode=false; qvDirty=false;
+  // تحديث الجدول بصرياً فوراً
+  rnT();
 
   db.collection('cancellations').doc(qvId).update(u)
     .catch(function(e){toast('خطأ في المزامنة','e');console.error(e);});
