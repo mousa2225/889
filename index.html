@@ -30,7 +30,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="css/styles.css?v=1888546084">
+  <link rel="stylesheet" href="css/styles.css?v=1778546084">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -242,6 +242,11 @@
             <button type="button" class="ei" onclick="expAll()">
               <i class="fa-solid fa-database text-warm"></i>
               <div>تصدير الكل<span class="dd">جميع السجلات بدون فلتر</span></div>
+            </button>
+            <div class="es"></div>
+            <button type="button" class="ei" onclick="togEm();openImport()">
+              <i class="fa-solid fa-file-import" style="color:#a78bfa"></i>
+              <div>رفع بيانات Excel<span class="dd">استيراد بيانات سابقة</span></div>
             </button>
           </div>
 
@@ -472,14 +477,14 @@
 <div id="tBox" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none"></div>
 
 <!-- ===================== SCRIPTS ===================== -->
-<script src="js/config.js?v=1888546084"></script>
-<script src="js/utils.js?v=1888546084"></script>
-<script src="js/auth.js?v=1888546084"></script>
-<script src="js/app.js?v=1888546084"></script>
-<script src="js/reports.js?v=1888546084"></script>
-  <script src="js/admin.js?v=1888546084"></script>
-<script src="js/import.js"></script>
-  <script src="js/export.js?v=1888546084"></script>
+<script src="js/config.js?v=1778546084"></script>
+<script src="js/utils.js?v=1778546084"></script>
+<script src="js/auth.js?v=1778546084"></script>
+<script src="js/app.js?v=1778546084"></script>
+<script src="js/reports.js?v=1778546084"></script>
+  <script src="js/admin.js?v=1778546084"></script>
+<script src="js/import.js?v=1778546084"></script>
+  <script src="js/export.js?v=1778546084"></script>
 
 <!-- App Init -->
 <script>
