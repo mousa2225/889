@@ -42,17 +42,22 @@ function impShowPreview(data) {
   // خريطة الأعمدة
   var mapDiv = document.getElementById('impColMap');
   var fields = [
-    { key:'name',            label:'اسم العميل *',         req:true  },
-    { key:'phone',           label:'الرقم *',              req:true  },
-    { key:'subscriptionDate',label:'تاريخ الاشتراك',       req:false },
-    { key:'packageType',     label:'نوع الباقة',           req:false },
-    { key:'packageDays',     label:'أيام الباقة',          req:false },
-    { key:'consumedDays',    label:'أيام مستهلكة',         req:false },
-    { key:'packagePrice',    label:'المبلغ المدفوع',       req:false },
-    { key:'refundAmount',    label:'المبلغ المسترد *',     req:true  },
-    { key:'cancelReason',    label:'سبب الإلغاء/الاسترداد',req:false },
-    { key:'referenceNumber', label:'الرقم المرجعي',        req:false },
-    { key:'notes',           label:'ملاحظات',              req:false },
+    { key:'name',            label:'اسم العميل *',              req:true  },
+    { key:'phone',           label:'الرقم *',                   req:true  },
+    { key:'refundAmount',    label:'المبلغ المسترد *',          req:true  },
+    { key:'subscriptionDate',label:'تاريخ الاشتراك',            req:false },
+    { key:'cancelDate',      label:'تاريخ الإلغاء',             req:false },
+    { key:'refundDate',      label:'تاريخ الاسترداد',           req:false },
+    { key:'packageType',     label:'نوع الباقة',                req:false },
+    { key:'packagePrice',    label:'المبلغ المدفوع',            req:false },
+    { key:'packageDays',     label:'أيام الباقة',               req:false },
+    { key:'consumedDays',    label:'أيام مستهلكة',              req:false },
+    { key:'cancellationPeriod',label:'مدة الإلغاء',            req:false },
+    { key:'cancelReason',    label:'سبب الإلغاء / الاسترداد',  req:false },
+    { key:'referenceNumber', label:'الرقم المرجعي',             req:false },
+    { key:'addedByUsername', label:'أضاف بواسطة',              req:false },
+    { key:'notes',           label:'ملاحظات',                   req:false },
+    { key:'rejectReason',    label:'سبب الرفض',                 req:false },
   ];
 
   var html = '<div style="font-size:10px;font-weight:700;color:var(--mt);margin-bottom:8px">تعيين الأعمدة</div>'
@@ -105,7 +110,12 @@ function autoMapCol(colName, fieldKey) {
     refundAmount:    ['مسترد','refund','استرداد','المبلغ المسترد'],
     cancelReason:    ['سبب','reason','cancel'],
     referenceNumber: ['مرجعي','reference','ref'],
-    notes:           ['ملاحظ','notes','note'],
+    notes:              ['ملاحظ','notes','note'],
+    refundDate:         ['تاريخ الاسترداد','refunddate','تاريخ استرداد','refund date'],
+    cancelDate:         ['تاريخ الالغاء','تاريخ الإلغاء','canceldate','cancel date'],
+    cancellationPeriod: ['مده','مدة','period','cancellation period','مدة الالغاء'],
+    addedByUsername:    ['اضاف','added by','مضاف','بواسطة','username'],
+    rejectReason:       ['سبب الرفض','reject','rejectreason'],
   };
   var keys = maps[fieldKey] || [];
   return keys.some(function(k){ return c.includes(k.toLowerCase().replace(/\s/g,'')); });
@@ -115,6 +125,50 @@ function getImpVal(row, fieldKey) {
   var sel = document.getElementById('imp_'+fieldKey);
   if (!sel || !sel.value) return '';
   return row[sel.value] !== undefined ? String(row[sel.value]) : '';
+}
+
+// ============================
+// تحويل تاريخ Excel (رقم أو نص) → نص مقروء
+// Excel serial: days since 1900-01-00
+// ============================
+function impParseDate(val) {
+  if (!val || val === '') return '';
+  var s = String(val).trim();
+  // لو رقم صحيح (serial date من Excel)
+  if (/^\d{4,6}$/.test(s)) {
+    var serial = parseInt(s);
+    // Excel serial → JavaScript Date
+    var d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) {
+      return d.getDate() + ' ' + ['يناير','فبراير','مارس','أبريل','مايو','يونيو',
+        'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'][d.getMonth()] + ' ' + d.getFullYear();
+    }
+  }
+  // لو نص عادي → normDateStr
+  return normDateStr(s) || s;
+}
+
+// ============================
+// التراجع عن آخر استيراد
+// ============================
+var lastImportBatchId = null;
+
+function undoLastImport() {
+  if (!lastImportBatchId) { toast('لا يوجد استيراد سابق في هذه الجلسة','w'); return; }
+  var bid = lastImportBatchId;
+  sCf('هل تريد حذف جميع سجلات آخر عملية استيراد؟', function() {
+    db.collection('cancellations').where('importBatch','==',bid).get()
+      .then(function(snap) {
+        if (snap.empty) { toast('لا توجد سجلات لهذا الاستيراد','w'); return; }
+        var b = db.batch();
+        snap.docs.forEach(function(d){ b.delete(d.ref); });
+        return b.commit().then(function(){
+          toast('تم حذف '+snap.size+' سجل من الاستيراد الأخير','s');
+          lastImportBatchId = null;
+          chkP();
+        });
+      }).catch(function(e){ toast('خطأ','e'); console.error(e); });
+  });
 }
 
 // تنفيذ الاستيراد
@@ -137,6 +191,7 @@ function doImport() {
   importDate.setHours(12,0,0,0);
   var ts = firebase.firestore.Timestamp.fromDate(importDate);
 
+  var importBatchId = 'imp_' + Date.now();
   var batch = db.batch();
   var count = 0, errors = 0;
 
@@ -147,14 +202,18 @@ function doImport() {
 
     if (!name || !phone) { errors++; return; }
 
-    var sub    = normDateStr(getImpVal(row,'subscriptionDate').trim()) || '';
+    var sub    = impParseDate(getImpVal(row,'subscriptionDate')) || '';
+    var cdt    = impParseDate(getImpVal(row,'cancelDate'))         || '';
     var pk     = getImpVal(row,'packageType').trim();
-    var dy     = parseFloat(getImpVal(row,'packageDays'))  || 0;
-    var co     = parseFloat(getImpVal(row,'consumedDays')) || 0;
-    var pr     = parseFloat(String(getImpVal(row,'packagePrice')).replace(/[^\d.]/g,'')) || 0;
+    var dy     = parseFloat(getImpVal(row,'packageDays'))   || 0;
+    var co     = parseFloat(getImpVal(row,'consumedDays'))  || 0;
+    var pr     = parseFloat(String(getImpVal(row,'packagePrice')).replace(/[^\d.]/g,''))   || 0;
+    var dr     = getImpVal(row,'cancellationPeriod').trim();
     var rs     = getImpVal(row,'cancelReason').trim();
     var ref    = getImpVal(row,'referenceNumber').trim();
+    var byUser = getImpVal(row,'addedByUsername').trim();
     var notes  = getImpVal(row,'notes').trim();
+    var rjrs   = getImpVal(row,'rejectReason').trim();
 
     // هل تم استرداده سابقاً بنفس الرقم والاشتراك
     var normSub = normDateStr(sub) || sub;
@@ -163,20 +222,28 @@ function doImport() {
       return xph && xph===phone && (x.subscriptionDate||'').trim()===normSub && getSt(x)==='refunded';
     });
 
+    var refundDateVal = impParseDate(getImpVal(row,'refundDate'));
+    var refundTs = refundDateVal ? firebase.firestore.Timestamp.fromDate(new Date(refundDateVal)) : ts;
+
     var doc = {
       name: name, phone: phone, mobile: phone,
       refundType: pr>0&&dy>0 ? 'subscription' : 'direct',
       subscriptionDate: normSub,
+      cancelDate: cdt,
+      cancellationPeriod: dr,
       packageType: pk, packagePrice: pr, packageDays: dy, consumedDays: co,
       refundAmount: refund, cancelReason: rs,
       referenceNumber: ref, notes: notes,
       status: status, refunded: status==='refunded',
       previouslyRefunded: prevRef,
-      addedByUsername: cu.username + ' (استيراد)',
+      addedByUsername: byUser || cu.username + ' (استيراد)',
       importedAt: ts,
-      createdAt: ts
+      createdAt: ts,
+      importBatch: importBatchId
     };
-    if (status==='refunded') doc.refundDate = ts;
+    if (rjrs) doc.rejectReason = rjrs;
+    if (status==='refunded') doc.refundDate = refundTs;
+    if (status==='rejected') doc.rejectReason = rjrs || '';
 
     batch.set(db.collection('cancellations').doc(), doc);
     count++;
@@ -190,6 +257,7 @@ function doImport() {
 
   batch.commit().then(function(){
     var msg = 'تم استيراد '+count+' سجل'; if(errors) msg += ' (تم تخطي '+errors+')'; toast(msg, 's');
+    lastImportBatchId = importBatchId;
     clImport();
     chkP();
   }).catch(function(e){
